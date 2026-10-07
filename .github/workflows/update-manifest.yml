@@ -1,1 +1,37 @@
+name: Update SHA256 manifest
 
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-manifest-main
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Generate manifest
+        run: python3 scripts/build-manifest.py
+
+      - name: Commit manifest if changed
+        run: |
+          if git diff --quiet -- manifest.sha256; then
+            echo "Manifest is already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.sha256
+          git commit -m "chore: update SHA256 manifest"
+          git push origin HEAD:main
