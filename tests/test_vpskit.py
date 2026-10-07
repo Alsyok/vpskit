@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Offline tests. Services and network commands are mocked; never operate on the host VPS."""
+import unittest.mock
 import ast,base64,copy,hashlib,json,os,pathlib,re,shutil,subprocess,tempfile,time,unittest,urllib.parse
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 def body(path,name):
  s=path.read_text();return re.search(r"<<'"+name+r"'\n(.*?)\n"+name,s,re.S).group(1)
 def namespace(path):
- ns={'__name__':'vpskit_test','__file__':str(path)};exec(compile(path.read_text(),str(path),'exec'),ns);return ns
+ ns={'__name__':'vpskit_test','__file__':str(path)};source=path.read_text().replace('/usr/local/lib/argo-node-files/sync-publication.py',str(ROOT/'lib/sync-publication.py'));exec(compile(source,str(path),'exec'),ns);return ns
 class SyntaxTests(unittest.TestCase):
  def test_shell_and_python(self):
   for p in ROOT.rglob('*.sh'):
@@ -32,7 +33,7 @@ class SyntaxTests(unittest.TestCase):
    self.assertNotIn("OUTPUT=pathlib.Path('/root/singbox_nodes.txt')",updated)
 class PublisherTests(unittest.TestCase):
  def test_groups_remove_and_rollback(self):
-  ns={'__name__':'test'};exec(body(ROOT/'lib/node-services.sh','NODE_FILES_PY'),ns)
+  ns=namespace(ROOT/'lib/node-files.py')
   with tempfile.TemporaryDirectory() as tmp:
    root=pathlib.Path(tmp);ns.update(ROOT=root/'nodes',LOCK=root/'lock')
    for group in ('argo','sing-box','xray'):ns['publish'](group,'vless://'+group+'@test:443\n')
@@ -60,6 +61,8 @@ class PublisherTests(unittest.TestCase):
     ns['STATE'].mkdir();ns['RUN'].mkdir();data=json.dumps(cfg).encode();ns['CONFIG'].write_bytes(data)
     ns['write'](ns['STATE']/'deployment.json',dict(ip='192.0.2.1',domain_mode=True));ns['write'](ns['RUN']/'active.json',dict(pid=100,ticks='5',sha=ns['digest'](data)))
     ns.update(process=lambda pid:'5',run=lambda *a,**k:b'',listeners=lambda *a:None)
+    publisher=namespace(ROOT/'lib/node-files.py');publisher.update(ROOT=ns['NODES'],LOCK=ns['PUBLISH_RUN'])
+    ns['publish_nodes']=lambda content:publisher['publish']('xray',content)
     ns['sync']();self.assertEqual(ns['OUTPUT'].read_text(),content)
     ns['CONFIG'].write_text('{}')
     with self.assertRaises(RuntimeError):ns['sync']()
@@ -266,5 +269,75 @@ class InstallationRollbackTests(unittest.TestCase):
    cert=ns['ROOT']/'saved.key';cert.write_text('KEEP CERT')
    removed=[];ns.update(confirm=lambda *a:True,alpine=lambda:False,stop_unit=lambda *a:None,call=lambda *a,**k:b'',remove_group=lambda name:removed.append(name),say=lambda *a:None)
    ns['uninstall_core']('sing-box');self.assertFalse(core.exists());self.assertFalse(ns['CONFIG'].exists());self.assertEqual(removed,['sing-box']);self.assertEqual(argo.read_text(),'KEEP ARGO');self.assertEqual(cert.read_text(),'KEEP CERT')
+
+def legacy_worker(source):
+ rows=source.splitlines(keepends=True)
+ node=next(n for n in ast.parse(source).body if isinstance(n,ast.FunctionDef) and n.name=='publish_nodes')
+ rows[node.lineno-1:node.end_lineno]=[(ROOT/'tests/fixtures/legacy-publication.txt').read_text()]
+ return ''.join(rows)
+class SharedPublicationTests(unittest.TestCase):
+ def test_adapters_and_readiness_functions_unchanged(self):
+  migration=namespace(ROOT/'lib/sync-publication.py')
+  def defs(source):return {n.name:ast.dump(n,include_attributes=False) for n in ast.parse(source).body if isinstance(n,ast.FunctionDef)}
+  for filename in ('singbox.sh','Encrypt.sh','musl-Xray.sh','install-Xray-core.sh'):
+   marker='XRAY_SYNC_PY' if 'Xray' in filename else 'NODE_SYNC_PY';group='xray' if 'Xray' in filename else 'sing-box'
+   source=body(ROOT/'installers'/filename,marker);self.assertEqual(source,migration['upgrade'](source,group))
+   self.assertNotIn('def link_lines',source);self.assertNotIn('PUBLISH_RUN=',source)
+   expected=json.loads((ROOT/'tests/fixtures/readiness-sha256.json').read_text())[filename]
+   updated=defs(source)
+   for name,digest in expected.items():self.assertEqual(hashlib.sha256(updated[name].encode()).hexdigest(),digest,filename+':'+name)
+   with tempfile.TemporaryDirectory() as tmp:
+    root=pathlib.Path(tmp);publisher=root/'publisher.py';code=(ROOT/'lib/node-files.py').read_text().replace("'/etc/nodes'",repr(str(root/'nodes'))).replace("'/run/nodes-publication'",repr(str(root/'lock')));publisher.write_text(code)
+    adapter=source.replace('/usr/local/lib/argo-node-files/run',str(publisher));ns={'__name__':'test'};exec(adapter,ns)
+    with unittest.mock.patch('subprocess.Popen',side_effect=AssertionError('must not spawn Python')):
+     ns['publish_nodes']('vless://'+group+'@test:443\n')
+    self.assertEqual((root/'nodes'/group/'links.txt').read_text(),'vless://'+group+'@test:443\n')
+ def test_concurrent_publish_remove_and_restore(self):
+  from concurrent.futures import ThreadPoolExecutor
+  with tempfile.TemporaryDirectory() as tmp:
+   root=pathlib.Path(tmp);publisher=root/'publisher.py';publisher.write_text((ROOT/'lib/node-files.py').read_text().replace("'/etc/nodes'",repr(str(root/'nodes'))).replace("'/run/nodes-publication'",repr(str(root/'lock'))))
+   def publish(group,n):subprocess.run(['python3',str(publisher),'--publish',group],input='vless://'+group+'-'+str(n)+'@test:443\n',text=True,check=True)
+   with ThreadPoolExecutor(max_workers=6) as pool:
+    futures=[pool.submit(publish,g,n) for n in range(8) for g in ('argo','sing-box','xray')]
+    for future in futures:future.result()
+   expected=[(root/'nodes'/g/'links.txt').read_text().strip() for g in ('argo','sing-box','xray')];self.assertEqual((root/'nodes/subscription.txt').read_text().splitlines(),expected)
+   subprocess.run(['python3',str(publisher),'--remove','xray'],check=True)
+   self.assertEqual((root/'nodes/subscription.txt').read_text().splitlines(),expected[:2])
+   # Restore only Xray's old link, keeping a concurrently changed Singbox group.
+   publish('sing-box',99);subprocess.run(['python3',str(publisher),'--publish','xray'],input=expected[2]+'\n',text=True,check=True)
+   self.assertEqual((root/'nodes/subscription.txt').read_text().splitlines(),[expected[0],'vless://sing-box-99@test:443',expected[2]])
+ def test_installed_upgrade_idempotent_and_no_core_restart(self):
+  from unittest.mock import patch
+  with tempfile.TemporaryDirectory() as tmp:
+   root=pathlib.Path(tmp);source=(ROOT/'lib/sync-publication.py').read_text()
+   for prefix in ('/usr/local/','/etc/','/run/'):source=source.replace(prefix,str(root)+prefix)
+   ns={'__name__':'test'};exec(source,ns)
+   original=legacy_worker(body(ROOT/'installers/Encrypt.sh','NODE_SYNC_PY'))
+   original=original.replace('/run/',str(root)+'/run/')
+   worker=pathlib.Path(ns['WORKERS'][1][0]);worker.parent.mkdir(parents=True);worker.write_text(original);worker.chmod(0o700)
+   service=root/'etc/init.d/alpine-node-sync';service.parent.mkdir(parents=True);service.write_text('# watcher')
+   commands=[]
+   def run(args,**kw):commands.append(args);return subprocess.CompletedProcess(args,0)
+   with patch('subprocess.run',side_effect=run):ns['migrate_installed']();once=worker.read_text();ns['migrate_installed']()
+   self.assertEqual(worker.read_text(),once);self.assertIn('VPSKIT_SHARED_PUBLICATION',once)
+   self.assertTrue(worker.with_name('run.before-shared-publication').exists());self.assertEqual(commands,[['rc-service','alpine-node-sync','status'],['rc-service','alpine-node-sync','restart']])
+ def test_failed_watcher_upgrade_restores_worker(self):
+  from unittest.mock import patch
+  with tempfile.TemporaryDirectory() as tmp:
+   root=pathlib.Path(tmp);source=(ROOT/'lib/sync-publication.py').read_text()
+   for prefix in ('/usr/local/','/etc/','/run/'):source=source.replace(prefix,str(root)+prefix)
+   ns={'__name__':'test'};exec(source,ns)
+   source=legacy_worker(body(ROOT/'installers/Encrypt.sh','NODE_SYNC_PY')).replace('/run/',str(root)+'/run/')
+   worker=pathlib.Path(ns['WORKERS'][1][0]);worker.parent.mkdir(parents=True);worker.write_text(source)
+   service=root/'etc/init.d/alpine-node-sync';service.parent.mkdir(parents=True);service.write_text('# watcher')
+   restarts=[]
+   def run(args,**kw):
+    if args[-1]=='restart':
+     restarts.append(args)
+     if len(restarts)==1:raise subprocess.CalledProcessError(1,args)
+    return subprocess.CompletedProcess(args,0)
+   with patch('subprocess.run',side_effect=run):
+    with self.assertRaises(RuntimeError):ns['migrate_installed']()
+   self.assertEqual(worker.read_text(),source);self.assertEqual(len(restarts),2)
 
 if __name__=='__main__':unittest.main(verbosity=2)

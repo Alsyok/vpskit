@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -eu
+[ -x /usr/local/lib/argo-node-files/run ] || { echo "请通过完整 VPSKit 安装入口运行。" >&2; exit 1; }
 umask 077
 # =========================================
 # Alpine 256MiB 容器专用
@@ -197,47 +198,10 @@ def country(ip):
     # Keep an old valid country when providers are unavailable; retry failures after 10 minutes.
     label=cache.get('label','');write(path,{'label':label,'expires':now+600,'ip':ip});return label
 # Unified TXT publication only; core configuration and readiness checks stay unchanged.
-NODES=pathlib.Path('/etc/nodes')
-PUBLISH_RUN=pathlib.Path('/run/nodes-publication')
-def link_lines(content):
-    result=[]
-    for line in content.splitlines():
-        line=line.strip()
-        if not line or line.startswith('#'):continue
-        if not re.match(r'^[a-zA-Z][a-zA-Z0-9+.-]*://\S+$',line):
-            raise RuntimeError('节点链接文件含无效行，保留旧文件')
-        if line not in result:result.append(line)
-    return result
 def publish_nodes(content):
-    lines=link_lines(content)
-    if not lines:raise RuntimeError('未生成有效节点，保留旧文件')
-    PUBLISH_RUN.mkdir(parents=True,exist_ok=True);os.chmod(PUBLISH_RUN,0o700)
-    NODES.mkdir(parents=True,exist_ok=True);os.chmod(NODES,0o700)
-    with open(PUBLISH_RUN/'lock','a') as publication_lock:
-        os.chmod(PUBLISH_RUN/'lock',0o600)
-        fcntl.flock(publication_lock,fcntl.LOCK_EX)
-        merged=[]
-        for group in ('argo','sing-box','xray'):
-            source=NODES/group/'links.txt'
-            entries=lines if group=='xray' else (link_lines(source.read_text()) if source.exists() else [])
-            for line in entries:
-                if line not in merged:merged.append(line)
-        targets=[(OUTPUT,'\n'.join(lines)+'\n'),
-                 (NODES/'subscription.txt','\n'.join(merged)+'\n')]
-        previous={p:p.read_bytes() if p.exists() else None for p,_ in targets}
-        touched=[]
-        try:
-            for p,text in targets:
-                if previous[p]!=text.encode():
-                    touched.append(p);atomic(p,text)
-                else:os.chmod(p,0o600)
-            os.chmod(OUTPUT.parent,0o700)
-        except Exception:
-            for p in reversed(touched):
-                if previous[p] is None:
-                    if p.exists():p.unlink()
-                else:atomic(p,previous[p])
-            raise
+    # VPSKIT_SHARED_PUBLICATION
+    import runpy
+    runpy.run_path('/usr/local/lib/argo-node-files/run',run_name='vpskit_publication')['publish']('xray',content)
 def process(pid):
     proc=pathlib.Path('/proc')/str(pid)
     if os.path.realpath(proc/'exe')!=os.path.realpath(BINARY):raise RuntimeError('Xray 进程未运行')

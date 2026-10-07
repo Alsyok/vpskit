@@ -5,7 +5,7 @@ VPSKIT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 . "$VPSKIT_ROOT/lib/node-services.sh"
 . "$VPSKIT_ROOT/lib/standalone.sh"
 detect
-install_node_files
+upgrade_node_publication
 case "${1:-menu}" in
     menu) standalone_action cert-menu;;
     info) standalone_action cert-list;;

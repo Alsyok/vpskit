@@ -1510,7 +1510,7 @@ sync_stamp() {
 
 main() {
     detect
-    install_node_files
+    upgrade_node_publication
     if [ -x "$SYNCBIN" ]; then
         write_sync_program
     fi
@@ -1560,7 +1560,7 @@ main() {
 }
 case "${1:-menu}" in
     menu) main;;
-    install) detect; install_node_files; install_log_maintenance; setup quick;;
+    install) detect; upgrade_node_publication; install_log_maintenance; setup quick;;
     info) detect; status; node_info;;
     edit) detect; fixed_menu;;
     uninstall) detect; uninstall_menu;;
