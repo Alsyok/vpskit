@@ -1449,13 +1449,13 @@ print_nodes() {
   REALITY_NAME=$("$NODE_SYNC_BIN" --label "VLESS-REALITY-${TAG}-${HOST_RAW}" "$COUNTRY_IP")
   HY2_NAME=$("$NODE_SYNC_BIN" --label "HY2-${TAG}-${HOST_RAW}" "$COUNTRY_IP")
 
+  local VLESS_URI_LOCAL
+
+  VLESS_URI_LOCAL="vless://${UUID}@${HOST_BR}:${VP}?encryption=none&security=tls&sni=${DOMAIN}&allowInsecure=${INS}&type=tcp#${TLS_NAME}"
+
   local VLESS_REALITY_URI_LOCAL
 
   VLESS_REALITY_URI_LOCAL="vless://${UUID}@${HOST_BR}:${RP}?encryption=none&security=reality&sni=${REALITY_SNI}&fp=chrome&pbk=${REALITY_PUBLIC_KEY}&sid=${REALITY_SHORT_ID}&type=tcp&flow=xtls-rprx-vision#${REALITY_NAME}"
-
-  local VLESS_URI_LOCAL
-
-  VLESS_URI_LOCAL="vless://${UUID}@${HOST_BR}:${VP}?encryption=none&security=tls&sni=${DOMAIN}&insecure=${INS}&type=tcp#${TLS_NAME}"
 
   local HY2_URI_LOCAL
 
