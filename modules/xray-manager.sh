@@ -11,7 +11,7 @@ xray_install() {
     [ "$MANAGER" = openrc ] || die '现有 Xray 安装脚本仅支持 Alpine。'
     standalone_tools
     command -v bash >/dev/null 2>&1 || apk add --no-cache bash
-    ask '选择安装方式：1 自签证书 / 2 正式或自签证书 / 0 返回：'
+    ask '选择安装方式：1 64M内存Xray / 2 Xray / 0 返回：'
     case "$REPLY" in
         1) xray_source=musl-Xray.sh;;
         2) xray_source=install-Xray-core.sh;;
