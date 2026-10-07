@@ -632,7 +632,7 @@ def issue_certificate(host=None,selfsigned=False):
         row={'id':hashlib.sha256(('self:'+host).encode()).hexdigest()[:20],'domain':host,'kind':'self','client':'openssl','method':'self','email':''}
         with tempfile.TemporaryDirectory(dir=ROOT) as tmp:
             cert=pathlib.Path(tmp)/'cert';key=pathlib.Path(tmp)/'key'
-            call(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','3650','-subj','/CN='+host,'-addext','subjectAltName=DNS:'+host,'-keyout',key,'-out',cert],timeout=60)
+            call(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','3650','-subj','/CN='+host,'-addext','subjectAltName=DNS:'+host,'-addext','basicConstraints=critical,CA:FALSE','-addext','extendedKeyUsage=serverAuth','-keyout',key,'-out',cert],timeout=60)
             return publish_certificate(row,cert,key)
     existing=next((r for r in registry().values() if r['domain']==host and r['kind']=='formal'),None)
     if existing and not confirm('已有该域名证书，重新检查/申请并替换它的管理方式？'):return existing

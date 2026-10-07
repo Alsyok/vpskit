@@ -95,7 +95,7 @@ else
     openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
         -keyout "$CERT_DIR/server.key" \
         -out "$CERT_DIR/server.crt" \
-        -subj "/CN=$DOMAIN" -addext "subjectAltName=DNS:$DOMAIN"
+        -subj "/CN=$DOMAIN" -addext "subjectAltName=DNS:$DOMAIN" -addext "basicConstraints=critical,CA:FALSE" -addext "extendedKeyUsage=serverAuth"
 fi
 
 # Download the release asset matching this machine into a private directory.
@@ -233,7 +233,16 @@ def generate(cfg,meta):
         host=sni if meta['domain_mode'] else ip
         if re.search(r'[\s/@?#]',host):raise RuntimeError('节点地址无效')
         host_uri='['+host+']' if ':' in host else host
-        query=urllib.parse.urlencode(dict(type='tcp',encryption='none',security='tls',sni=sni,allowInsecure='0' if meta['domain_mode'] else '1'),quote_via=urllib.parse.quote)
+        params=dict(type='tcp',encryption='none',security='tls',sni=sni,allowInsecure='0')
+        if not meta['domain_mode']:
+            certificates=stream['tlsSettings'].get('certificates',[])
+            if len(certificates)!=1 or not certificates[0].get('certificateFile'):
+                raise RuntimeError('无法确定节点使用的自签证书，保留旧链接')
+            # Hash the leaf certificate DER, not the PEM file or public key.
+            der=run(['openssl','x509','-in',certificates[0]['certificateFile'],'-outform','DER'])
+            if not der:raise RuntimeError('证书读取失败，保留旧链接')
+            params['pcs']=hashlib.sha256(der).hexdigest()
+        query=urllib.parse.urlencode(params,quote_via=urllib.parse.quote)
         name='VLESS-TLS-'+tag+'-'+host+('-'+location if location else '')
         for user in inbound['settings']['clients']:
             uid=str(uuid.UUID(user['id']))

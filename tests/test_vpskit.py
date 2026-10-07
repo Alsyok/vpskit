@@ -64,7 +64,9 @@ class PublisherTests(unittest.TestCase):
    content,ports=ns['generate'](cfg,dict(ip='192.0.2.1',domain_mode=True))
    self.assertIn('allowInsecure=0',content);self.assertIn('@test.example:18477',content)
    self.assertEqual(urllib.parse.unquote(content.split('#')[1]).strip(),'VLESS-TLS-V4PORT-test.example-🇸🇬Singapore')
-   content6,_=ns['generate'](cfg,dict(ip='2001:db8::1',domain_mode=False));self.assertIn('@[2001:db8::1]:18477',content6);self.assertIn('allowInsecure=1',content6)
+   cfg['inbounds'][0]['streamSettings']['tlsSettings']['certificates']=[{'certificateFile':'/test/self.pem'}]
+   ns['run']=lambda *a,**k:b'test certificate DER'
+   content6,_=ns['generate'](cfg,dict(ip='2001:db8::1',domain_mode=False));self.assertIn('@[2001:db8::1]:18477',content6);self.assertIn('allowInsecure=0',content6);self.assertIn('pcs='+hashlib.sha256(b'test certificate DER').hexdigest(),content6)
    with tempfile.TemporaryDirectory() as tmp:
     root=pathlib.Path(tmp);ns.update(CONFIG=root/'config.json',STATE=root/'state',RUN=root/'run',NODES=root/'nodes',OUTPUT=root/'nodes/xray/links.txt',PUBLISH_RUN=root/'pub')
     ns['STATE'].mkdir();ns['RUN'].mkdir();data=json.dumps(cfg).encode();ns['CONFIG'].write_bytes(data)
@@ -76,6 +78,24 @@ class PublisherTests(unittest.TestCase):
     ns['CONFIG'].write_text('{}')
     with self.assertRaises(RuntimeError):ns['sync']()
     self.assertEqual(ns['OUTPUT'].read_text(),content)
+class XrayCertificatePinTests(unittest.TestCase):
+ def test_real_certificate_hash_and_replacement(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   root=pathlib.Path(tmp);key=root/'key.pem';cert=root/'cert.pem'
+   cfg={'inbounds':[{'port':443,'protocol':'vless','settings':{'clients':[{'id':'7bd86e44-7eaf-4815-855d-58079c65ca96'}]},'streamSettings':{'network':'tcp','security':'tls','tlsSettings':{'serverName':'test.example','certificates':[{'certificateFile':str(cert)}]}}}]}
+   previous=None
+   for _ in range(2):
+    subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=test.example','-addext','subjectAltName=DNS:test.example','-addext','basicConstraints=critical,CA:FALSE','-keyout',str(key),'-out',str(cert)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    fingerprint=subprocess.check_output(['openssl','x509','-in',str(cert),'-noout','-fingerprint','-sha256']).decode().strip().split('=')[1].replace(':','').lower()
+    self.assertNotEqual(fingerprint,previous);previous=fingerprint
+    for filename in ('musl-Xray.sh','install-Xray-core.sh'):
+     ns={'__name__':'test'};exec(body(ROOT/'installers'/filename,'XRAY_SYNC_PY'),ns);ns['country']=lambda ip:''
+     content,_=ns['generate'](cfg,dict(ip='192.0.2.1',domain_mode=False))
+     query=urllib.parse.parse_qs(urllib.parse.urlsplit(content.strip()).query)
+     self.assertEqual(query['pcs'],[fingerprint]);self.assertEqual(query['allowInsecure'],['0'])
+     formal,_=ns['generate'](cfg,dict(ip='192.0.2.1',domain_mode=True));self.assertNotIn('pcs=',formal)
+   cert.unlink()
+   with self.assertRaises(Exception):ns['generate'](cfg,dict(ip='192.0.2.1',domain_mode=False))
 class EditTests(unittest.TestCase):
  def test_xray_transaction(self):
   for fail in (False,True):
