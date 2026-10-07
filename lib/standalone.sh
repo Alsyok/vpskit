@@ -12,12 +12,10 @@ singbox_standalone_install() {
             apt-get install -y bash curl ca-certificates
         fi
     fi
-    TMP=$(mktemp -d); chmod 700 "$TMP"
-    printf '\n  %s正在准备 sing-box 安装脚本…%s\n' "$C_CYAN" "$C_RESET"
-    cp "$standalone_url" "$TMP/install.sh" || die '安装脚本不存在。'
-    [ -s "$TMP/install.sh" ] || die '安装脚本为空。'
-    bash -n "$TMP/install.sh" || die '安装脚本语法检查失败，未执行。'
-    bash "$TMP/install.sh"
+    standalone_tools
+    bash -n "$standalone_url" || die '安装脚本语法检查失败，未执行。'
+    python3 /usr/local/lib/argo-standalone/manager.py singbox-install "$standalone_url"
+
 }
 standalone_tools() {
     if ! command -v python3 >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v socat >/dev/null 2>&1; then

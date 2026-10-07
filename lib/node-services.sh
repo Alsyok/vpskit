@@ -133,13 +133,8 @@ install_node_files() {
 }
 
 
-upgrade_node_publication() {
+prepare_node_publication() {
     install_node_files
-    publication_upgrade_tmp=$(mktemp /usr/local/lib/argo-node-files/.upgrade.XXXXXX)
-    cp "$VPSKIT_ROOT/lib/sync-publication.py" "$publication_upgrade_tmp"
-    chmod 700 "$publication_upgrade_tmp"
-    mv -f "$publication_upgrade_tmp" /usr/local/lib/argo-node-files/sync-publication.py
-    python3 /usr/local/lib/argo-node-files/sync-publication.py
     if [ -f /usr/local/lib/argo-standalone/manager.py ]; then
         publication_manager_tmp=$(mktemp /usr/local/lib/argo-standalone/.manager.XXXXXX)
         cp "$VPSKIT_ROOT/lib/node-manager.py" "$publication_manager_tmp"

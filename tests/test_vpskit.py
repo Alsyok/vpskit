@@ -29,8 +29,17 @@ class SyntaxTests(unittest.TestCase):
   self.assertNotIn('ARGO_STANDALONE_PY',text)
   for file in ('Encrypt.sh','singbox.sh'):
    ns=namespace(ROOT/'lib/node-manager.py');source=body(ROOT/'installers'/file,'NODE_SYNC_PY')
-   updated=ns['upgrade_sync_source'](source);compile(updated,file,'exec');self.assertEqual(updated,ns['upgrade_sync_source'](updated))
+   updated=ns['current_sync_source'](source);compile(updated,file,'exec');self.assertEqual(updated,ns['current_sync_source'](updated))
    self.assertNotIn("OUTPUT=pathlib.Path('/root/singbox_nodes.txt')",updated)
+class FreshStartupTests(unittest.TestCase):
+ def test_startup_does_not_migrate_old_workers(self):
+  for path in [ROOT/'vpskit.sh',ROOT/'lib/node-services.sh',*list((ROOT/'modules').glob('*.sh'))]:
+   source=path.read_text()
+   self.assertNotIn('migrate_installed',source)
+   self.assertNotIn('sync-publication.py',source)
+  ns=namespace(ROOT/'lib/node-manager.py')
+  with self.assertRaises(ns['Error']):ns['current_sync_source']('def old_sync():pass')
+  self.assertNotIn('var/backups/vpskit', (ROOT/'lib/node-manager.py').read_text())
 class PublisherTests(unittest.TestCase):
  def test_groups_remove_and_rollback(self):
   ns=namespace(ROOT/'lib/node-files.py')
@@ -230,34 +239,43 @@ class CertificateSyncTests(unittest.TestCase):
    ns['sync']();self.assertEqual(cert.read_bytes(),(root/'new.crt').read_bytes());self.assertEqual(key.stat().st_mode&0o777,0o600)
 
 class InstallationRollbackTests(unittest.TestCase):
- def test_xray_failed_reinstall_restores_binary_config_links(self):
+ def test_fresh_install_failure_never_restores_old_install(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   installer=pathlib.Path(tmp)/'musl-Xray.sh';installer.write_text('# stub')
+   ns=namespace(ROOT/'lib/node-manager.py');calls=[]
+   ns.update(management_lock=__import__('contextlib').nullcontext,alpine=lambda:True,call=lambda *a,**k:b'',say=lambda *a:None,fresh_cleanup=lambda kind:calls.append(('clean',kind)),xrestart=lambda:calls.append(('restart',)),xinfo=lambda:None)
+   def failed(*args,**kwargs):raise KeyboardInterrupt()
+   ns['managed_run']=failed
+   with self.assertRaises(KeyboardInterrupt):ns['xinstall'](installer)
+   self.assertEqual(calls,[('clean','xray'),('clean','xray')])
+ def test_fresh_install_success_starts_new_xray(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   installer=pathlib.Path(tmp)/'musl-Xray.sh';installer.write_text('# stub')
+   ns=namespace(ROOT/'lib/node-manager.py');calls=[]
+   ns.update(management_lock=__import__('contextlib').nullcontext,alpine=lambda:True,call=lambda *a,**k:b'',say=lambda *a:None,fresh_cleanup=lambda kind:calls.append(('clean',kind)),managed_run=lambda *a,**k:subprocess.CompletedProcess(a,0),xrestart=lambda:calls.append(('restart',)),xinfo=lambda:None)
+   ns['xinstall'](installer);self.assertEqual(calls,[('clean','xray'),('restart',)])
+ def test_fresh_cleanup_preserves_other_core_argo_and_cron(self):
   with tempfile.TemporaryDirectory() as tmp:
    root=pathlib.Path(tmp);source=(ROOT/'lib/node-manager.py').read_text()
-   for prefix in ('/usr/local/','/etc/','/var/','/run/'):source=source.replace(prefix,str(root)+prefix)
-   ns={'__name__':'test'};exec(source,ns);ns['ROOT'].mkdir(parents=True)
-   config=ns['XCONFIG'];config.parent.mkdir(parents=True);config.write_text('OLD CONFIG')
-   binary=pathlib.Path(ns['XBIN']);binary.parent.mkdir(parents=True);binary.write_bytes(b'OLD BINARY')
-   ns['XSTATE'].parent.mkdir(parents=True);ns['XSTATE'].write_text('OLD META')
-   links=root/'etc/nodes/xray/links.txt';links.parent.mkdir(parents=True);links.write_text('vless://old@test:443\n')
-   worker=ns['XWORKER'];worker.parent.mkdir(parents=True);worker.write_text('OLD WORKER')
-   cert=config.parent/'cert/server.key';cert.parent.mkdir();cert.write_text('OLD KEY')
-   installer=root/'musl-Xray.sh';installer.write_text('# stub')
-   class MockProcess:
-    PIPE=subprocess.PIPE;DEVNULL=subprocess.DEVNULL
-    @staticmethod
-    def run(*a,**kw):return subprocess.CompletedProcess(a,0,b'0 1 * * * echo unrelated\n* * * * * old # xray-node-sync\n',b'')
-   ns['subprocess']=MockProcess;calls=[]
-   def call(args,**kw):
-    calls.append(args)
-    if '--publish' in args:links.write_bytes(kw['input'])
-    return b''
-   def installer_run(*a,**kw):
-    binary.write_bytes(b'NEW BINARY');config.write_text('NEW CONFIG');worker.write_text('NEW WORKER');cert.write_text('NEW KEY');ns['XSTATE'].write_text('NEW META');links.write_text('vless://new@test:443\n');raise KeyboardInterrupt()
-   restored=[]
-   ns.update(call=call,managed_run=installer_run,xstop=lambda:None,xpids=lambda:[(10,'3')],xrestart=lambda:restored.append(config.read_text()),say=lambda *a:None)
-   with self.assertRaises(KeyboardInterrupt):ns['xinstall'](installer)
-   self.assertEqual(binary.read_bytes(),b'OLD BINARY');self.assertEqual(config.read_text(),'OLD CONFIG');self.assertEqual(worker.read_text(),'OLD WORKER');self.assertEqual(cert.read_text(),'OLD KEY');self.assertEqual(ns['XSTATE'].read_text(),'OLD META');self.assertEqual(links.read_text(),'vless://old@test:443\n');self.assertEqual(restored,['OLD CONFIG'])
-   self.assertFalse(list((root/'var/backups/vpskit').glob('xray-*')))
+   for prefix in ('/usr/local/','/usr/bin/','/usr/lib/','/lib/','/etc/','/var/','/run/','/root/','/proc'):
+    source=source.replace(prefix,str(root)+prefix)
+   ns={'__name__':'test'};exec(source,ns)
+   (root/'proc').mkdir()
+   for name in ('sing-box','xray'):
+    config=root/'etc'/name/'config.json';config.parent.mkdir(parents=True);config.write_text('old')
+    binary=root/'usr/local/bin'/name;binary.parent.mkdir(parents=True,exist_ok=True);binary.write_text('old')
+   argo=root/'usr/local/lib/vps-node/core';argo.parent.mkdir(parents=True);argo.write_text('keep')
+   cert=root/'etc/argo-certificates/shared.key';cert.parent.mkdir(parents=True);cert.write_text('keep')
+   service=root/'etc/init.d/third-party-sb';service.parent.mkdir(parents=True);service.write_text('command_args="'+str(root)+'/etc/sing-box/config.json"')
+   removed=[];commands=[];stopped=[]
+   def call(args,**kw):commands.append((args,kw));return b''
+   with unittest.mock.patch('subprocess.run',return_value=subprocess.CompletedProcess([],0,b'* * * * * sync # alpine-node-sync\n0 1 * * * echo unrelated\n',b'')),unittest.mock.patch('shutil.which',return_value='/usr/bin/crontab'):
+    ns.update(alpine=lambda:True,call=call,stop_unit=lambda n:stopped.append(n),remove_group=lambda n:removed.append(n))
+    ns['fresh_cleanup']('sing-box')
+   self.assertFalse((root/'etc/sing-box').exists());self.assertFalse(service.exists())
+   self.assertTrue((root/'etc/xray/config.json').exists());self.assertEqual(argo.read_text(),'keep');self.assertEqual(cert.read_text(),'keep')
+   self.assertIn('third-party-sb',stopped);self.assertEqual(removed,['sing-box'])
+   self.assertEqual(commands[0][1]['input'],b'0 1 * * * echo unrelated\n')
  def test_uninstall_singbox_keeps_argo_and_certificates(self):
   with tempfile.TemporaryDirectory() as tmp:
    root=pathlib.Path(tmp);source=(ROOT/'lib/node-manager.py').read_text()
@@ -277,11 +295,10 @@ def legacy_worker(source):
  return ''.join(rows)
 class SharedPublicationTests(unittest.TestCase):
  def test_adapters_and_readiness_functions_unchanged(self):
-  migration=namespace(ROOT/'lib/sync-publication.py')
   def defs(source):return {n.name:ast.dump(n,include_attributes=False) for n in ast.parse(source).body if isinstance(n,ast.FunctionDef)}
   for filename in ('singbox.sh','Encrypt.sh','musl-Xray.sh','install-Xray-core.sh'):
    marker='XRAY_SYNC_PY' if 'Xray' in filename else 'NODE_SYNC_PY';group='xray' if 'Xray' in filename else 'sing-box'
-   source=body(ROOT/'installers'/filename,marker);self.assertEqual(source,migration['upgrade'](source,group))
+   source=body(ROOT/'installers'/filename,marker);self.assertIn('VPSKIT_SHARED_PUBLICATION',source)
    self.assertNotIn('def link_lines',source);self.assertNotIn('PUBLISH_RUN=',source)
    expected=json.loads((ROOT/'tests/fixtures/readiness-sha256.json').read_text())[filename]
    updated=defs(source)
@@ -306,38 +323,5 @@ class SharedPublicationTests(unittest.TestCase):
    # Restore only Xray's old link, keeping a concurrently changed Singbox group.
    publish('sing-box',99);subprocess.run(['python3',str(publisher),'--publish','xray'],input=expected[2]+'\n',text=True,check=True)
    self.assertEqual((root/'nodes/subscription.txt').read_text().splitlines(),[expected[0],'vless://sing-box-99@test:443',expected[2]])
- def test_installed_upgrade_idempotent_and_no_core_restart(self):
-  from unittest.mock import patch
-  with tempfile.TemporaryDirectory() as tmp:
-   root=pathlib.Path(tmp);source=(ROOT/'lib/sync-publication.py').read_text()
-   for prefix in ('/usr/local/','/etc/','/run/'):source=source.replace(prefix,str(root)+prefix)
-   ns={'__name__':'test'};exec(source,ns)
-   original=legacy_worker(body(ROOT/'installers/Encrypt.sh','NODE_SYNC_PY'))
-   original=original.replace('/run/',str(root)+'/run/')
-   worker=pathlib.Path(ns['WORKERS'][1][0]);worker.parent.mkdir(parents=True);worker.write_text(original);worker.chmod(0o700)
-   service=root/'etc/init.d/alpine-node-sync';service.parent.mkdir(parents=True);service.write_text('# watcher')
-   commands=[]
-   def run(args,**kw):commands.append(args);return subprocess.CompletedProcess(args,0)
-   with patch('subprocess.run',side_effect=run):ns['migrate_installed']();once=worker.read_text();ns['migrate_installed']()
-   self.assertEqual(worker.read_text(),once);self.assertIn('VPSKIT_SHARED_PUBLICATION',once)
-   self.assertTrue(worker.with_name('run.before-shared-publication').exists());self.assertEqual(commands,[['rc-service','alpine-node-sync','status'],['rc-service','alpine-node-sync','restart']])
- def test_failed_watcher_upgrade_restores_worker(self):
-  from unittest.mock import patch
-  with tempfile.TemporaryDirectory() as tmp:
-   root=pathlib.Path(tmp);source=(ROOT/'lib/sync-publication.py').read_text()
-   for prefix in ('/usr/local/','/etc/','/run/'):source=source.replace(prefix,str(root)+prefix)
-   ns={'__name__':'test'};exec(source,ns)
-   source=legacy_worker(body(ROOT/'installers/Encrypt.sh','NODE_SYNC_PY')).replace('/run/',str(root)+'/run/')
-   worker=pathlib.Path(ns['WORKERS'][1][0]);worker.parent.mkdir(parents=True);worker.write_text(source)
-   service=root/'etc/init.d/alpine-node-sync';service.parent.mkdir(parents=True);service.write_text('# watcher')
-   restarts=[]
-   def run(args,**kw):
-    if args[-1]=='restart':
-     restarts.append(args)
-     if len(restarts)==1:raise subprocess.CalledProcessError(1,args)
-    return subprocess.CompletedProcess(args,0)
-   with patch('subprocess.run',side_effect=run):
-    with self.assertRaises(RuntimeError):ns['migrate_installed']()
-   self.assertEqual(worker.read_text(),source);self.assertEqual(len(restarts),2)
 
 if __name__=='__main__':unittest.main(verbosity=2)

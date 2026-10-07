@@ -269,18 +269,11 @@ def verify_service_config():
         elif str(CONFIG) not in call(['systemctl','show','sing-box.service','--property=ExecStart','--value']).decode():raise Error('服务配置路径不匹配。')
 
 PUBLICATION_SOURCE='ZGVmIHB1Ymxpc2hfbm9kZXMoY29udGVudCk6CiAgICAjIFZQU0tJVF9TSEFSRURfUFVCTElDQVRJT04KICAgIGltcG9ydCBydW5weQogICAgcnVucHkucnVuX3BhdGgoJy91c3IvbG9jYWwvbGliL2FyZ28tbm9kZS1maWxlcy9ydW4nLHJ1bl9uYW1lPSd2cHNraXRfcHVibGljYXRpb24nKVsncHVibGlzaCddKCdzaW5nLWJveCcsY29udGVudCkK'
-def upgrade_sync_source(source):
-    source=source.replace("OUTPUT=pathlib.Path('/root/singbox_nodes.txt')","OUTPUT=pathlib.Path('/etc/nodes/sing-box/links.txt')")
-    source=source.replace("SECONDARY=pathlib.Path('/etc/sing-box/v2rayn_links.txt')\n",'')
-    if 'def publish_nodes(content):' not in source:
-        anchor='def write(p,data):atomic(p,json.dumps(data,ensure_ascii=False))'
-        if anchor not in source:raise Error('未知同步程序，未修改。')
-        source=source.replace(anchor,base64.b64decode(PUBLICATION_SOURCE).decode()+anchor,1)
-        start=source.index('    if not OUTPUT.exists() or OUTPUT.read_text()!=content:',source.index('def sync():'))
-        end=source.index('\ndef main():',start)
-        source=source[:start]+'    publish_nodes(content)\n'+source[end:]
-    import runpy
-    return runpy.run_path('/usr/local/lib/argo-node-files/sync-publication.py',run_name='vpskit_upgrade')['upgrade'](source,'sing-box')
+def current_sync_source(source):
+    if '# VPSKIT_SHARED_PUBLICATION' not in source:
+        raise Error('这是旧版同步程序，请从安装菜单执行全新安装。')
+    compile(source,'node sync','exec')
+    return source
 
 @locked
 def initialize_sync():
@@ -299,11 +292,9 @@ def initialize_sync():
     for path in (pathlib.Path('/usr/local/lib/singbox-node-sync/run'),pathlib.Path('/usr/local/lib/alpine-node-sync/run')):
         if not path.exists():continue
         original_source=path.read_text()
-        source=upgrade_sync_source(original_source)
+        source=current_sync_source(original_source)
         if 'def generate(cfg,meta):' not in source or "'/run/singbox-node-sync'" not in source:raise Error('检测到未知节点同步程序，未改动它。')
         if '# ARGO_CERT_GENERATOR' not in source:
-            backup=path.with_name(path.name+'.before-cert-manager')
-            if not backup.exists():atomic(backup,original_source,0o700)
             prefix="def generate(cfg,meta):\n    # ARGO_CERT_GENERATOR\n    import runpy\n    return runpy.run_path('/usr/local/lib/argo-standalone/manager.py',run_name='argo_generator')['generate_links'](cfg,meta)\n"
             source=source.replace('def generate(cfg,meta):\n',prefix,1)
         if source!=original_source:
@@ -328,8 +319,6 @@ def initialize_sync():
 def configure_openrc_sync():
     old=RC_CORE.read_bytes() if RC_CORE.exists() else None
     oldsync=RC_SYNC.read_bytes() if RC_SYNC.exists() else None
-    backup=RC_CORE.with_name('sing-box.before-argo-cert-manager')
-    if old is not None and not backup.exists():atomic(backup,old,0o755)
     was=active()
     # Stop with the original service file and PID format, before switching supervisor.
     if was:service('stop')
@@ -1092,58 +1081,97 @@ def uninstall_core(kind):
     if not alpine():call(['systemctl','daemon-reload'])
     say('卸载完成，合并订阅已重新生成。','ok')
 
-@locked
-def xinstall(source):
-    source=pathlib.Path(source)
-    if source.name not in ('musl-Xray.sh','install-Xray-core.sh') or not source.is_file():raise Error('未知 Xray 安装器。')
-    pathlib.Path('/var/backups/vpskit').mkdir(parents=True,exist_ok=True)
-    backup=pathlib.Path(tempfile.mkdtemp(prefix='xray-',dir='/var/backups/vpskit'));backup.chmod(0o700)
-    targets=[pathlib.Path('/etc/xray'),pathlib.Path(XBIN),XWORKER.parent,XSTATE.parent,pathlib.Path('/etc/init.d/vpskit-xray')]
-    existing=[]
-    was=bool(xpids());old_links=pathlib.Path('/etc/nodes/xray/links.txt');links=old_links.read_text() if old_links.exists() else None
-    cron=subprocess.run(['crontab','-l'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
-    old_jobs=[l for l in cron.stdout.decode().splitlines() if '# xray-node-sync' in l]
-    enabled=pathlib.Path('/etc/runlevels/default/vpskit-xray').exists()
-    for n,p in enumerate(targets):
-        if p.exists():
-            existing.append(n)
-            if p.is_dir():shutil.copytree(p,backup/str(n),symlinks=True)
-            else:shutil.copy2(p,backup/str(n))
-    restored=True
-    try:
-        xstop()
-        result=managed_run(['bash',source],timeout=1800)
-        if result.returncode:raise Error('安装器未完成。')
-        xrestart();xinfo()
-    except BaseException:
+def fresh_cleanup(kind):
+    if kind not in ('sing-box','xray'):raise Error('未知核心')
+    names=(('sing-box','singbox','singbox-node-sync','argo-sb-sync','alpine-node-sync') if kind=='sing-box' else ('xray','vpskit-xray','xray-node-sync'))
+    config_paths=('/etc/sing-box/','/usr/local/etc/sing-box/') if kind=='sing-box' else ('/etc/xray/','/usr/local/etc/xray/')
+    units=set(names)
+    # Identify dedicated third-party units by their independent config directory.
+    directories=('/etc/init.d',) if alpine() else ('/etc/systemd/system','/usr/lib/systemd/system','/lib/systemd/system')
+    for folder in directories:
+        base=pathlib.Path(folder)
+        if not base.exists():continue
+        for file in base.iterdir():
+            if not file.is_file() or file.name.startswith(('vps-node','vps-tunnel')):continue
+            if not alpine() and file.suffix not in ('.service','.timer'):continue
+            text=file.read_text(errors='replace')
+            executable=re.search(r'(?:ExecStart|command)\s*=.*?(?:/|\s|[\"\'])'+re.escape(kind)+r'(?:[\s\"\']|$)',text,re.M)
+            if any(path in text for path in config_paths) or executable:units.add(file.name)
+    # Timers/watchers stop before the core to prevent republishing old links.
+    for name in sorted(units,key=lambda n:('sync' not in n,n)):
+        if alpine():stop_unit(name.removesuffix('.service').removesuffix('.timer'))
+        else:
+            candidates=(name,) if name.endswith(('.service','.timer')) else (name+'.timer',name+'.service')
+            for unit in candidates:
+                if subprocess.run(['systemctl','show',unit,'--property=LoadState','--value'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL).stdout.strip() not in (b'',b'not-found'):
+                    stop_unit(unit)
+    processes=[]
+    for path in pathlib.Path('/proc').iterdir():
+        if not path.name.isdigit():continue
         try:
-            xstop()
-            for n,p in enumerate(targets):
-                if p.is_dir():shutil.rmtree(p)
-                else:p.unlink(missing_ok=True)
-                if n in existing:
-                    p.parent.mkdir(parents=True,exist_ok=True)
-                    if (backup/str(n)).is_dir():shutil.copytree(backup/str(n),p,symlinks=True)
-                    else:shutil.copy2(backup/str(n),p)
-            current=subprocess.run(['crontab','-l'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
-            jobs=[l for l in current.stdout.decode().splitlines() if '# xray-node-sync' not in l]+old_jobs
+            exe=re.sub(r' \(deleted\)$','',os.readlink(path/'exe'))
+            args=(path/'cmdline').read_bytes().replace(b'\0',b' ').decode(errors='replace')
+            if '/etc/vps-node' in args or '/usr/local/lib/vps-node' in args or '/usr/local/lib/vps-node' in exe:continue
+            if pathlib.Path(exe).name!=kind:continue
+            processes.append((int(path.name),(path/'stat').read_text().rsplit(')',1)[1].split()[19]))
+        except OSError:continue
+    for sig in (signal.SIGTERM,signal.SIGKILL):
+        for pid,ticks in processes:
+            try:
+                if pathlib.Path('/proc',str(pid),'stat').read_text().rsplit(')',1)[1].split()[19]==ticks:os.kill(pid,sig)
+            except (OSError,ProcessLookupError):pass
+        deadline=time.monotonic()+3
+        while time.monotonic()<deadline and any(pathlib.Path('/proc',str(pid)).exists() for pid,_ in processes):time.sleep(.1)
+    if shutil.which('crontab'):
+        cron=subprocess.run(['crontab','-l'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
+        if cron.returncode==0:
+            tokens=(('singbox-node-sync','alpine-node-sync','argo-standalone/node-sync.py','/etc/sing-box/','/usr/local/etc/sing-box/') if kind=='sing-box' else ('xray-node-sync','/etc/xray/','/usr/local/etc/xray/','/usr/local/bin/xray'))
+            jobs=[line for line in cron.stdout.decode().splitlines() if not any(token in line for token in tokens)]
             call(['crontab','-'],input=('\n'.join(jobs)+'\n').encode())
-            if enabled:call(['rc-update','add','vpskit-xray','default'])
-            else:call(['rc-update','del','vpskit-xray','default'],allowed=(0,1))
-            if was:xrestart()
-            if not enabled:call(['rc-update','del','vpskit-xray','default'],allowed=(0,1))
-            if links is None:remove_group('xray')
-            else:call(['/usr/local/lib/argo-node-files/run','--publish','xray'],input=links.encode())
-            say('安装失败，原 Xray 配置和链接已恢复。','warn')
-        except Exception:
-            restored=False;say('恢复未完成，备份保留于 '+str(backup)+'；请查看 /var/log/xray.log。','warn')
+    folders=(['/etc/sing-box','/usr/local/etc/sing-box','/usr/local/lib/singbox-node-sync','/usr/local/lib/alpine-node-sync','/var/lib/singbox-node-sync','/run/singbox-node-sync'] if kind=='sing-box' else ['/etc/xray','/usr/local/etc/xray','/usr/local/lib/xray-node-sync','/var/lib/xray-node-sync','/run/xray-node-sync'])
+    files=[pathlib.Path('/usr/local/bin',kind),pathlib.Path('/usr/bin',kind)]
+    if kind=='sing-box':files += [SYNC,pathlib.Path('/root/singbox_nodes.txt')]
+    else:files += [pathlib.Path('/usr/local/bin',n) for n in ('xray-info','xray-renew-reload')]
+    for name in units:
+        if alpine():files.append(pathlib.Path('/etc/init.d',name.removesuffix('.service').removesuffix('.timer')))
+        else:
+            unitnames=(name,) if name.endswith(('.service','.timer')) else (name+'.service',name+'.timer')
+            for unit in unitnames:
+                files.append(pathlib.Path('/etc/systemd/system',unit));folders.append('/etc/systemd/system/'+unit+'.d')
+    for file in files:
+        if file.is_file() or file.is_symlink():file.unlink()
+    for folder in folders:
+        path=pathlib.Path(folder)
+        if path.is_symlink():path.unlink()
+        elif path.exists():shutil.rmtree(path)
+    remove_group(kind)
+    if not alpine():call(['systemctl','daemon-reload'])
+
+@locked
+def fresh_install(kind,source):
+    source=pathlib.Path(source)
+    allowed=('singbox.sh','Encrypt.sh') if kind=='sing-box' else ('musl-Xray.sh','install-Xray-core.sh')
+    if source.name not in allowed or not source.is_file():raise Error('未知安装器')
+    if kind=='xray' and not alpine():raise Error('现有 Xray 安装仅支持 Alpine')
+    call(['bash','-n',source])
+    say('全新安装 '+kind+'：旧配置、服务和节点链接将被清理，不备份、不恢复。','warn')
+    fresh_cleanup(kind)
+    try:
+        result=managed_run(['bash',source],timeout=1800)
+        if result.returncode:raise Error('安装器未完成，请重新安装。')
+        if kind=='xray':xrestart();xinfo()
+    except BaseException:
+        try:fresh_cleanup(kind)
+        except Exception:say('未完成安装的清理失败，请检查服务状态。','warn')
+        say('安装未完成，旧安装不会恢复；请重新执行安装。','warn')
         raise
-    finally:
-        if restored:shutil.rmtree(backup,ignore_errors=True)
+
+def xinstall(source):return fresh_install('xray',source)
 
 def main():
     setup_root();action=sys.argv[1] if len(sys.argv)>1 else 'cert-menu'
-    if action=='xray-install':xinstall(sys.argv[2])
+    if action=='singbox-install':fresh_install('sing-box',sys.argv[2])
+    elif action=='xray-install':xinstall(sys.argv[2])
     elif action=='xray-info':xinfo()
     elif action=='xray-edit':xedit()
     elif action=='xray-restart':xrestart();xinfo()

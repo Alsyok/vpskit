@@ -5,7 +5,7 @@ VPSKIT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 . "$VPSKIT_ROOT/lib/node-services.sh"
 . "$VPSKIT_ROOT/lib/standalone.sh"
 detect
-upgrade_node_publication
+prepare_node_publication
 install_log_maintenance
 xray_install() {
     [ "$MANAGER" = openrc ] || die '现有 Xray 安装脚本仅支持 Alpine。'
