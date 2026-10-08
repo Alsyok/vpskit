@@ -30,9 +30,12 @@ if [ "$(id -u)" != "0" ]; then
     exit 1
 fi
 
-# 选择端口；明确确认，避免手机终端多余回车直接采用默认值。
+# 选择端口；显示提示前丢弃前一层菜单残留的终端输入。
 echo "===================================="
 echo "VLESS 端口设置"
+if [ -t 0 ]; then
+    python3 -c 'import termios; termios.tcflush(0, termios.TCIFLUSH)'
+fi
 while :; do
     read -r -p "请输入 VLESS 端口 [默认 ${DEFAULT_PORT}]： " VLESS_PORT
     VLESS_PORT=$(printf '%s' "$VLESS_PORT" | tr -d ' \t\r')
@@ -42,15 +45,7 @@ while :; do
         continue
     fi
     VLESS_PORT=$((10#$VLESS_PORT))
-    while :; do
-        read -r -p "使用端口 ${VLESS_PORT}？输入 y 确认 / n 重新输入： " PORT_CONFIRM
-        PORT_CONFIRM=$(printf '%s' "$PORT_CONFIRM" | tr -d ' \t\r')
-        case "$PORT_CONFIRM" in
-            y|Y|yes|YES) break 2;;
-            n|N|no|NO) break;;
-            *) echo "请输入 y 或 n。";;
-        esac
-    done
+    break
 done
 echo "使用端口：$VLESS_PORT"
 echo "===================================="
