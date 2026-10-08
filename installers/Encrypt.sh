@@ -138,16 +138,34 @@ detect_public_ips_strict() {
 #################################
 # ===== sing-box 安装（稳健）=====
 #################################
+singbox_usable() {
+  command -v sing-box >/dev/null 2>&1 && sing-box version >/dev/null 2>&1
+}
+
 install_singbox() {
   apk add --no-cache ca-certificates curl jq openssl >/dev/null
 
-  if need_cmd sing-box; then return 0; fi
+  hash -r
+  if singbox_usable; then return 0; fi
+  # Removing an old package binary does not remove apk's installed record.
+  if apk info -e sing-box >/dev/null 2>&1; then
+    echo "[i] 修复 sing-box 软件包文件"
+    apk fix --no-cache --reinstall sing-box || true
+    hash -r
+    if singbox_usable; then return 0; fi
+  fi
   echo "[i] Try: apk add sing-box (current repos)"
-  if apk add --no-cache sing-box >/dev/null 2>&1; then return 0; fi
+  if apk add --no-cache sing-box; then
+    hash -r
+    if singbox_usable; then return 0; fi
+  fi
 
   EDGE_COMMUNITY="https://dl-cdn.alpinelinux.org/alpine/edge/community"
   echo "[i] Try: apk add sing-box (edge/community)"
-  if apk add --no-cache --repository="$EDGE_COMMUNITY" sing-box >/dev/null 2>&1; then return 0; fi
+  if apk add --no-cache --repository="$EDGE_COMMUNITY" sing-box; then
+    hash -r
+    if singbox_usable; then return 0; fi
+  fi
 
   echo "[!] apk install failed; fallback to GitHub release (musl/static preferred)"
 
@@ -195,6 +213,8 @@ install_singbox() {
 
   install -m 0755 "$BIN" /usr/local/bin/sing-box
   ln -sf /usr/local/bin/sing-box /usr/bin/sing-box 2>/dev/null || true
+  hash -r
+  singbox_usable || die "sing-box 核心无法运行，安装未完成。"
 }
 
 #################################
@@ -232,13 +252,13 @@ generate_reality_keypair_persist() {
   KEY_PRIV_FILE="/etc/sing-box/reality_private_key.txt"
   KEY_PUB_FILE="/etc/sing-box/reality_public_key.txt"
 
-  KP="$(sing-box generate reality-keypair 2>/dev/null || true)"
+  KP="$(sing-box generate reality-keypair)" || die "Reality 密钥生成失败，请查看上面的核心报错。"
   REALITY_PRIV="$(printf "%s\n" "$KP" | sed -n 's/^PrivateKey: *//p' | head -n1)"
   REALITY_PUB="$(printf "%s\n" "$KP" | sed -n 's/^PublicKey: *//p' | head -n1)"
 
   [ -n "${REALITY_PRIV:-}" ] && [ -n "${REALITY_PUB:-}" ] || {
     echo "[x] Reality keypair 解析失败，sing-box 输出如下："
-    echo "$KP"
+    echo "输出格式不符合预期（私钥内容不显示）。"
     exit 1
   }
 
