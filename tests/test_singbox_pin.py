@@ -14,6 +14,8 @@ class SingboxPinTests(unittest.TestCase):
     link=next(line for line in ns['generate'](cfg,meta).splitlines() if line.startswith('vless://'))
     q=urllib.parse.parse_qs(urllib.parse.urlsplit(link).query)
     self.assertEqual(q['pcs'],[expected]);self.assertEqual(q['allowInsecure'],['0'])
+    formal=ns['generate'](cfg,dict(meta,mode='1'))
+    self.assertIn('pcs='+expected,formal)
     ns['run']=lambda *a,**k:(_ for _ in ()).throw(RuntimeError('missing cert'))
     with self.assertRaises(RuntimeError):ns['generate'](cfg,meta)
    ns=runpy.run_path(str(ROOT/'lib/node-manager.py'),run_name='test');ns['alpine']=lambda:True;ns['geo']=lambda ip:''
@@ -21,3 +23,6 @@ class SingboxPinTests(unittest.TestCase):
    ns['generate_links'].__globals__.update(alpine=lambda:True,geo=lambda ip:'',cert_kind=lambda p:'self')
    q=urllib.parse.parse_qs(urllib.parse.urlsplit(ns['generate_links'](cfg,meta).strip()).query)
    self.assertEqual(q['pcs'],[expected]);self.assertEqual(q['allowInsecure'],['0'])
+
+   ns['generate_links'].__globals__['cert_kind']=lambda p:'formal'
+   self.assertIn('pcs='+expected,ns['generate_links'](cfg,meta))

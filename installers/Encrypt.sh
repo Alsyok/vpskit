@@ -684,11 +684,11 @@ def generate(cfg,meta):
                     query.update(fp='chrome',pbk=public_key(tls['reality']['private_key']),sid=ids[0])
                     if user.get('flow'):query['flow']=user['flow']
                 else:
-                    der=run(['openssl','x509','-in',tls['certificate_path'],'-outform','DER']) if insecure=='1' else b''
-                    if insecure=='1' and not der:raise RuntimeError('证书读取失败，保留旧链接')
+                    der=run(['openssl','x509','-in',tls['certificate_path'],'-outform','DER'])
+                    if not der:raise RuntimeError('证书读取失败，保留旧链接')
                     query.pop('insecure',None)
                     query['allowInsecure']='0'
-                    if insecure=='1':query['pcs']=hashlib.sha256(der).hexdigest()
+                    query['pcs']=hashlib.sha256(der).hexdigest()
                 prefix='VLESS-Reality' if reality else 'VLESS-TLS'
                 uri='vless://'+uid+'@'+host+':'+str(port)
             else:

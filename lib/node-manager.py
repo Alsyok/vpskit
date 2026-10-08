@@ -252,10 +252,9 @@ def generate_links(cfg,meta,indices=None):
                     if u.get('flow'):q['flow']=u['flow']
                 else:
                     q['allowInsecure']='0'
-                    if insecure=='1':
-                        der=call(['openssl','x509','-in',tls['certificate_path'],'-outform','DER'])
-                        if not der:raise Error('证书读取失败，保留旧链接。')
-                        q['pcs']=hashlib.sha256(der).hexdigest()
+                    der=call(['openssl','x509','-in',tls['certificate_path'],'-outform','DER'])
+                    if not der:raise Error('证书读取失败，保留旧链接。')
+                    q['pcs']=hashlib.sha256(der).hexdigest()
             else:
                 uid=urllib.parse.quote(u['password'],safe='');scheme='hysteria2://';prefix='HY2';q={'sni':sni,'insecure':insecure}
             family=ipaddress.ip_address(ip).version

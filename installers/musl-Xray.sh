@@ -200,14 +200,13 @@ def generate(cfg,meta):
         if re.search(r'[\s/@?#]',host):raise RuntimeError('节点地址无效')
         host_uri='['+host+']' if ':' in host else host
         params=dict(type='tcp',encryption='none',security='tls',sni=sni,allowInsecure='0')
-        if not meta['domain_mode']:
-            certificates=stream['tlsSettings'].get('certificates',[])
-            if len(certificates)!=1 or not certificates[0].get('certificateFile'):
-                raise RuntimeError('无法确定节点使用的自签证书，保留旧链接')
-            # Hash the leaf certificate DER, not the PEM file or public key.
-            der=run(['openssl','x509','-in',certificates[0]['certificateFile'],'-outform','DER'])
-            if not der:raise RuntimeError('证书读取失败，保留旧链接')
-            params['pcs']=hashlib.sha256(der).hexdigest()
+        certificates=stream['tlsSettings'].get('certificates',[])
+        if len(certificates)!=1 or not certificates[0].get('certificateFile'):
+            raise RuntimeError('无法确定节点使用的证书，保留旧链接')
+        # Hash the leaf certificate DER, not the PEM file or public key.
+        der=run(['openssl','x509','-in',certificates[0]['certificateFile'],'-outform','DER'])
+        if not der:raise RuntimeError('证书读取失败，保留旧链接')
+        params['pcs']=hashlib.sha256(der).hexdigest()
         query=urllib.parse.urlencode(params,quote_via=urllib.parse.quote)
         name='VLESS-TLS-'+tag+'-'+host+('-'+location if location else '')
         for user in inbound['settings']['clients']:

@@ -75,6 +75,8 @@ class PublisherTests(unittest.TestCase):
    ns={'__name__':'test'};exec(body(ROOT/'installers'/file,'XRAY_SYNC_PY'),ns)
    cfg={'inbounds':[{'port':18477,'protocol':'vless','settings':{'clients':[{'id':'7bd86e44-7eaf-4815-855d-58079c65ca96'}]},'streamSettings':{'network':'tcp','security':'tls','tlsSettings':{'serverName':'test.example'}}}]}
    ns['country']=lambda ip:'🇸🇬Singapore'
+   cfg['inbounds'][0]['streamSettings']['tlsSettings']['certificates']=[{'certificateFile':'/test/cert.pem'}]
+   ns['run']=lambda *a,**k:b'test certificate DER'
    content,ports=ns['generate'](cfg,dict(ip='192.0.2.1',domain_mode=True))
    self.assertIn('allowInsecure=0',content);self.assertIn('@test.example:18477',content)
    self.assertEqual(urllib.parse.unquote(content.split('#')[1]).strip(),'VLESS-TLS-V4PORT-test.example-🇸🇬Singapore')
@@ -85,7 +87,7 @@ class PublisherTests(unittest.TestCase):
     root=pathlib.Path(tmp);ns.update(CONFIG=root/'config.json',STATE=root/'state',RUN=root/'run',NODES=root/'nodes',OUTPUT=root/'nodes/xray/links.txt',PUBLISH_RUN=root/'pub')
     ns['STATE'].mkdir();ns['RUN'].mkdir();data=json.dumps(cfg).encode();ns['CONFIG'].write_bytes(data)
     ns['write'](ns['STATE']/'deployment.json',dict(ip='192.0.2.1',domain_mode=True));ns['write'](ns['RUN']/'active.json',dict(pid=100,ticks='5',sha=ns['digest'](data)))
-    ns.update(process=lambda pid:'5',run=lambda *a,**k:b'',listeners=lambda *a:None)
+    ns.update(process=lambda pid:'5',run=lambda args,**k:b'test certificate DER' if args[0]=='openssl' else b'',listeners=lambda *a:None)
     publisher=namespace(ROOT/'lib/node-files.py');publisher.update(ROOT=ns['NODES'],LOCK=ns['PUBLISH_RUN'])
     ns['publish_nodes']=lambda content:publisher['publish']('xray',content)
     ns['sync']();self.assertEqual(ns['OUTPUT'].read_text(),content)
@@ -107,7 +109,7 @@ class XrayCertificatePinTests(unittest.TestCase):
      content,_=ns['generate'](cfg,dict(ip='192.0.2.1',domain_mode=False))
      query=urllib.parse.parse_qs(urllib.parse.urlsplit(content.strip()).query)
      self.assertEqual(query['pcs'],[fingerprint]);self.assertEqual(query['allowInsecure'],['0'])
-     formal,_=ns['generate'](cfg,dict(ip='192.0.2.1',domain_mode=True));self.assertNotIn('pcs=',formal)
+     formal,_=ns['generate'](cfg,dict(ip='192.0.2.1',domain_mode=True));self.assertIn('pcs='+fingerprint,formal)
    cert.unlink()
    with self.assertRaises(Exception):ns['generate'](cfg,dict(ip='192.0.2.1',domain_mode=False))
 class EditTests(unittest.TestCase):

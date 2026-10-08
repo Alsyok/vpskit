@@ -1225,10 +1225,9 @@ def generate(cfg,meta):
                     query.update(fp='chrome',pbk=public_key(tls['reality']['private_key']),sid=ids[0],type='tcp',flow=user.get('flow',''))
                 else:
                     query.update(allowInsecure='0',type='tcp')
-                    if insecure=='1':
-                        der=run(['openssl','x509','-in',tls['certificate_path'],'-outform','DER'])
-                        if not der:raise RuntimeError('证书读取失败，保留旧链接')
-                        query['pcs']=hashlib.sha256(der).hexdigest()
+                    der=run(['openssl','x509','-in',tls['certificate_path'],'-outform','DER'])
+                    if not der:raise RuntimeError('证书读取失败，保留旧链接')
+                    query['pcs']=hashlib.sha256(der).hexdigest()
                 uri='vless://'+uid+'@'+host_br+':'+str(port)
             else:
                 password=user.get('password','')
