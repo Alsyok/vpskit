@@ -236,13 +236,28 @@ www.yahoo.com
 EOF
 )"
   echo
-  echo "Reality 伪装站：回车=随机从池里选；也可以手动输入域名"
-  echo "$POOL" | sed 's/^/  - /'
-  prompt REALITY_HANDSHAKE_SERVER "伪装目标域名" ""
-  if [ -z "${REALITY_HANDSHAKE_SERVER:-}" ]; then
-    REALITY_HANDSHAKE_SERVER="$(printf "%s\n" "$POOL" | pick_random)"
-    echo "[+] 已随机选择：$REALITY_HANDSHAKE_SERVER"
-  fi
+  echo "Reality 伪装站：输入编号或域名；回车=随机从池里选"
+  printf "%s\n" "$POOL" | awk '{printf "  %d. %s\n", NR, $0}'
+  while :; do
+    prompt REALITY_HANDSHAKE_SERVER "伪装目标域名（编号 / 域名，回车随机）" ""
+    case "$REALITY_HANDSHAKE_SERVER" in
+      "")
+        REALITY_HANDSHAKE_SERVER="$(printf "%s\n" "$POOL" | pick_random)"
+        echo "[+] 已随机选择：$REALITY_HANDSHAKE_SERVER"
+        break
+        ;;
+      *[!0-9]*) break ;;
+      *)
+        SELECTED_REALITY_SERVER="$(printf "%s\n" "$POOL" | awk -v choice="$REALITY_HANDSHAKE_SERVER" 'NR == choice {print; exit}')"
+        if [ -n "$SELECTED_REALITY_SERVER" ]; then
+          REALITY_HANDSHAKE_SERVER="$SELECTED_REALITY_SERVER"
+          echo "[+] 已选择：$REALITY_HANDSHAKE_SERVER"
+          break
+        fi
+        echo "[x] 编号无效，请输入 1–9，或直接输入域名。"
+        ;;
+    esac
+  done
   REALITY_HANDSHAKE_PORT="443"
   REALITY_CLIENT_SNI="$REALITY_HANDSHAKE_SERVER"
 }
