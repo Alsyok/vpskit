@@ -155,7 +155,7 @@ run_action() {
     if [ "$pause_owner" = 1 ]; then rm -f "$APIBASE/pause-pid"; fi
     set -e
     [ "$action_result" != 130 ] && [ "$action_result" != 143 ] || exit "$action_result"
-    if [ "$action_result" -ne 0 ]; then warn '操作未完成，请查看上面的错误提示。'; fi
+    if [ "$action_result" -ne 0 ] && [ "$action_result" -ne 20 ]; then warn '操作未完成，请查看上面的错误提示。'; fi
 }
 
 show_subscription() {

@@ -835,6 +835,16 @@ def group_input(label,values,validate=lambda v:v,generate=None,secret=False):
         try:return generate() if generate and value.lower()=='g' else validate(value)
         except (Error,ValueError):say('↻ 输入格式无效，请重新输入。','retry')
 
+def edit_listen_ports(targets):
+    def valid_port(v):
+        if not v.isdigit() or not 1<=int(v)<=65535:raise Error('端口应为 1–65535。')
+        return int(v)
+    for target in targets:
+        family=ipaddress.ip_address(target.get('listen','::')).version
+        label='IPv'+str(family)+' 监听端口'
+        value=group_input(label,[target['listen_port']],valid_port)
+        if value is not None:target['listen_port']=value
+
 def edit_node(kind):
     cfg=config();old=CONFIG.read_bytes();indices=select_inbounds(cfg,kind);new=copy.deepcopy(cfg);targets=[new['inbounds'][i] for i in indices];display_indices=list(indices)
     title('修改 '+{'reality':'VLESS-Reality','tls':'VLESS-TLS','hy2':'Hysteria2'}[kind])
@@ -861,12 +871,7 @@ def edit_node(kind):
         value=group_input('UUID（G 自动生成）',[u['uuid'] for u in selected_users],lambda v:str(uuid.UUID(v)),lambda:str(uuid.uuid4()))
         if value is not None:
             for u in selected_users:u['uuid']=value
-    def valid_port(v):
-        if not v.isdigit() or not 1<=int(v)<=65535:raise Error('端口应为 1–65535。')
-        return int(v)
-    value=group_input('监听端口',[t['listen_port'] for t in targets],valid_port)
-    if value is not None:
-        for t in targets:t['listen_port']=value
+    edit_listen_ports(targets)
     if kind=='reality':
         realities=[t['tls']['reality'] for t in targets]
         value=group_input('伪装目标',[r['handshake']['server'] for r in realities],domain)
@@ -930,6 +935,8 @@ def node_info():
     title('NODE · 节点信息');print(color('link',path.read_text()))
 
 def node_menu():
+    if not CONFIG.exists():
+        say('尚未安装独立 sing-box，请先完成安装。','warn');return
     while True:
         title('更改节点配置');item(1,'VLESS-Reality','edit');item(2,'VLESS-TLS','edit');item(3,'Hysteria2','edit');item(0,'返回上一级','dim')
         option=choose('请选择',('0','1','2','3'))
@@ -1174,11 +1181,17 @@ def fresh_install(kind,source):
     if kind=='xray' and not alpine():raise Error('现有 Xray 安装仅支持 Alpine')
     call(['bash','-n',source])
     say('全新安装 '+kind+'：旧配置、服务和节点链接将被清理，不备份、不恢复。','warn')
+    if not confirm('确认清理旧安装并继续全新部署？'):
+        say('已取消安装，原配置和服务保持不变。','dim');return False
     fresh_cleanup(kind)
     try:
-        result=managed_run(['bash',source],timeout=1800)
+        env=dict(os.environ,VPSKIT_INSTALL_CONFIRMED='1')
+        result=managed_run(['bash',source],timeout=1800,env=env)
         if result.returncode:raise Error('安装器未完成，请重新安装。')
         if kind=='xray':xrestart();xinfo()
+        else:
+            if not CONFIG.exists():raise Error('安装器结束但未生成配置，请重新安装。')
+        return True
     except BaseException:
         try:fresh_cleanup(kind)
         except Exception:say('未完成安装的清理失败，请检查服务状态。','warn')
@@ -1189,8 +1202,10 @@ def xinstall(source):return fresh_install('xray',source)
 
 def main():
     setup_root();action=sys.argv[1] if len(sys.argv)>1 else 'cert-menu'
-    if action=='singbox-install':fresh_install('sing-box',sys.argv[2])
-    elif action=='xray-install':xinstall(sys.argv[2])
+    if action=='singbox-install':
+        if not fresh_install('sing-box',sys.argv[2]):sys.exit(20)
+    elif action=='xray-install':
+        if not xinstall(sys.argv[2]):sys.exit(20)
     elif action=='xray-info':xinfo()
     elif action=='xray-edit':xedit()
     elif action=='xray-restart':xrestart();xinfo()

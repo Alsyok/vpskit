@@ -279,7 +279,7 @@ class InstallationRollbackTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as tmp:
    installer=pathlib.Path(tmp)/'musl-Xray.sh';installer.write_text('# stub')
    ns=namespace(ROOT/'lib/node-manager.py');calls=[]
-   ns.update(management_lock=__import__('contextlib').nullcontext,alpine=lambda:True,call=lambda *a,**k:b'',say=lambda *a:None,fresh_cleanup=lambda kind:calls.append(('clean',kind)),xrestart=lambda:calls.append(('restart',)),xinfo=lambda:None)
+   ns.update(confirm=lambda *a:True,management_lock=__import__('contextlib').nullcontext,alpine=lambda:True,call=lambda *a,**k:b'',say=lambda *a:None,fresh_cleanup=lambda kind:calls.append(('clean',kind)),xrestart=lambda:calls.append(('restart',)),xinfo=lambda:None)
    def failed(*args,**kwargs):raise KeyboardInterrupt()
    ns['managed_run']=failed
    with self.assertRaises(KeyboardInterrupt):ns['xinstall'](installer)
@@ -288,7 +288,7 @@ class InstallationRollbackTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as tmp:
    installer=pathlib.Path(tmp)/'musl-Xray.sh';installer.write_text('# stub')
    ns=namespace(ROOT/'lib/node-manager.py');calls=[]
-   ns.update(management_lock=__import__('contextlib').nullcontext,alpine=lambda:True,call=lambda *a,**k:b'',say=lambda *a:None,fresh_cleanup=lambda kind:calls.append(('clean',kind)),managed_run=lambda *a,**k:subprocess.CompletedProcess(a,0),xrestart=lambda:calls.append(('restart',)),xinfo=lambda:None)
+   ns.update(confirm=lambda *a:True,management_lock=__import__('contextlib').nullcontext,alpine=lambda:True,call=lambda *a,**k:b'',say=lambda *a:None,fresh_cleanup=lambda kind:calls.append(('clean',kind)),managed_run=lambda *a,**k:subprocess.CompletedProcess(a,0),xrestart=lambda:calls.append(('restart',)),xinfo=lambda:None)
    ns['xinstall'](installer);self.assertEqual(calls,[('clean','xray'),('restart',)])
  def test_fresh_cleanup_preserves_other_core_argo_and_cron(self):
   with tempfile.TemporaryDirectory() as tmp:
@@ -361,3 +361,19 @@ class SharedPublicationTests(unittest.TestCase):
    self.assertEqual((root/'nodes/subscription.txt').read_text().splitlines(),[expected[0],'vless://sing-box-99@test:443',expected[2]])
 
 if __name__=='__main__':unittest.main(verbosity=2)
+
+class InstallCancelAndPortTests(unittest.TestCase):
+ def test_cancel_before_cleanup_or_installer(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   installer=pathlib.Path(tmp)/'singbox.sh';installer.write_text('# stub')
+   ns=namespace(ROOT/'lib/node-manager.py');calls=[]
+   ns.update(management_lock=__import__('contextlib').nullcontext,call=lambda *a,**k:b'',say=lambda *a:None,confirm=lambda *a:False,fresh_cleanup=lambda *a:calls.append('cleanup'),managed_run=lambda *a,**k:calls.append('installer'))
+   self.assertFalse(ns['fresh_install']('sing-box',installer));self.assertEqual(calls,[])
+ def test_ports_independent_and_blank_preserved(self):
+  ns=namespace(ROOT/'lib/node-manager.py');targets=[dict(listen='0.0.0.0',listen_port=28282),dict(listen='::',listen_port=38997)]
+  labels=[];answers=iter(['30001',''])
+  ns.update(prompt=lambda text,**kw:(labels.append(text),next(answers))[1])
+  ns['edit_listen_ports'](targets)
+  self.assertEqual([t['listen_port'] for t in targets],[30001,38997]);self.assertIn('IPv4',labels[0]);self.assertIn('IPv6',labels[1])
+  answers=iter(['0','40002']);ns['say']=lambda *a:None
+  ns['edit_listen_ports']([targets[1]]);self.assertEqual(targets[1]['listen_port'],40002)
