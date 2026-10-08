@@ -23,7 +23,23 @@ def prompt(text,default='',secret=False):
     tail=' '+color('default','['+str(default)+']') if default!='' else ''
     label='  '+color('prompt',text)+tail+'：'
     try:
-        value=(getpass.getpass(label) if secret and sys.stdin.isatty() else input(label)).strip().strip('\r')
+        if sys.stdin.isatty():
+            import termios
+            fd=sys.stdin.fileno()
+            # Avoid buffered input() read-ahead and queued CR/LF from prior prompts.
+            termios.tcflush(fd,termios.TCIFLUSH)
+            if secret:value=getpass.getpass(label)
+            else:
+                print(label,end='',flush=True)
+                raw=bytearray()
+                while True:
+                    byte=os.read(fd,1)
+                    if not byte:raise EOFError()
+                    if byte in (b'\n',b'\r'):break
+                    raw.extend(byte)
+                value=raw.decode(sys.stdin.encoding or 'utf-8',errors='replace')
+        else:value=input(label)
+        value=value.strip().strip('\r')
     except EOFError:raise Cancel()
     return value if value else str(default)
 def choose(text,options,default=''):
