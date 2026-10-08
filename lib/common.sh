@@ -64,7 +64,16 @@ ask() {
             printf '  %s%s%s%s%s' "$ask_base_color" "${ask_prefix#  }" "$C_PURPLE" '输入 “YES/y” 继续，“NO/n” 取消：' "$C_RESET" >&2;;
         *) printf '  ' >&2; print_prompt_defaults "${1#  }" "$ask_base_color";;
     esac
-    IFS= read -r REPLY || exit 0
+    while :; do
+        IFS= read -r REPLY || exit 0
+        REPLY=$(printf '%s' "$REPLY" | tr -d '\r')
+        case "$1" in
+            '请选择 ['*|'选择安装方式：'*)
+                REPLY=$(printf '%s' "$REPLY" | tr -d ' \t')
+                [ -n "$REPLY" ] || continue;;
+        esac
+        break
+    done
     REPLY=$(printf '%s' "$REPLY" | tr -d '\r')
 }
 menu_item() { printf '  %s%3s%s  %s%s%s\n' "$C_WHITE" "$2" "$C_RESET" "$1" "$3" "$C_RESET"; }

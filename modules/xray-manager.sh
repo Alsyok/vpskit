@@ -11,13 +11,15 @@ xray_install() {
     [ "$MANAGER" = openrc ] || die '现有 Xray 安装脚本仅支持 Alpine。'
     standalone_tools
     command -v bash >/dev/null 2>&1 || apk add --no-cache bash
-    ask '选择安装方式：1 64M内存Xray / 2 Xray / 0 返回：'
-    case "$REPLY" in
-        1) xray_source=musl-Xray.sh;;
-        2) xray_source=install-Xray-core.sh;;
-        0) return;;
-        *) die '请输入 0–2。';;
-    esac
+    while :; do
+        ask '选择安装方式：1 64M内存Xray / 2 Xray / 0 返回：'
+        case "$REPLY" in
+            1) xray_source=musl-Xray.sh; break;;
+            2) xray_source=install-Xray-core.sh; break;;
+            0) return;;
+            *) retry_input '请输入 0、1 或 2。';;
+        esac
+    done
     bash -n "$VPSKIT_ROOT/installers/$xray_source"
     python3 /usr/local/lib/argo-standalone/manager.py xray-install "$VPSKIT_ROOT/installers/$xray_source"
 }

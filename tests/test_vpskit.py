@@ -40,6 +40,20 @@ class FreshStartupTests(unittest.TestCase):
   ns=namespace(ROOT/'lib/node-manager.py')
   with self.assertRaises(ns['Error']):ns['current_sync_source']('def old_sync():pass')
   self.assertNotIn('var/backups/vpskit', (ROOT/'lib/node-manager.py').read_text())
+class MobileMenuTests(unittest.TestCase):
+ def test_blank_crlf_and_invalid_selection(self):
+  common=(ROOT/'lib/common.sh').read_text()
+  ask=common[common.index('ask() {'):common.index('menu_item() {')]
+  stub="print_prompt_defaults() { :; }; C_CYAN=; C_PROMPT=; C_PURPLE=; C_RESET=;\n"
+  code=stub+ask+"\nask '请选择 [0–7]：'; printf '%s' \"$REPLY\""
+  result=subprocess.run(['sh','-c',code],input='\r\n\n 2 \r\n',text=True,capture_output=True,timeout=5)
+  self.assertEqual(result.stdout,'2');self.assertEqual(result.returncode,0)
+  default=stub+ask+"\nask '域名 [example.com]：'; printf '<%s>' \"$REPLY\""
+  result=subprocess.run(['sh','-c',default],input='\n',text=True,capture_output=True,timeout=5);self.assertEqual(result.stdout,'<>')
+  module=(ROOT/'modules/xray-manager.sh').read_text();func=module[module.index('xray_install() {'):module.index('case "${1:-menu}" in')]
+  code=stub+ask+"\nMANAGER=openrc; VPSKIT_ROOT=/test; standalone_tools() { :; }; die() { exit 1; }; retry_input() { :; }; bash() { :; }; python3() { printf '%s' \"$3\"; };\n"+func+'\nxray_install'
+  result=subprocess.run(['sh','-c',code],input='\n9\n2\r\n',text=True,capture_output=True,timeout=5)
+  self.assertEqual(result.returncode,0);self.assertEqual(result.stdout,'/test/installers/install-Xray-core.sh')
 class PublisherTests(unittest.TestCase):
  def test_groups_remove_and_rollback(self):
   ns=namespace(ROOT/'lib/node-files.py')
