@@ -30,27 +30,28 @@ if [ "$(id -u)" != "0" ]; then
     exit 1
 fi
 
-# 选择端口
+# 选择端口；明确确认，避免手机终端多余回车直接采用默认值。
 echo "===================================="
 echo "VLESS 端口设置"
-read -p "请输入 VLESS 端口 [默认 ${DEFAULT_PORT}]： " VLESS_PORT
-
-# 如果直接回车，使用默认端口
-if [ -z "$VLESS_PORT" ]; then
-    VLESS_PORT=$DEFAULT_PORT
-fi
-
-# 简单端口校验：必须是 1-65535 的数字
-if ! echo "$VLESS_PORT" | grep -Eq '^[0-9]+$'; then
-    echo "端口必须是数字，当前输入：$VLESS_PORT"
-    exit 1
-fi
-
-if [ "$VLESS_PORT" -lt 1 ] || [ "$VLESS_PORT" -gt 65535 ]; then
-    echo "端口必须在 1-65535 之间，当前输入：$VLESS_PORT"
-    exit 1
-fi
-
+while :; do
+    read -r -p "请输入 VLESS 端口 [默认 ${DEFAULT_PORT}]： " VLESS_PORT
+    VLESS_PORT=$(printf '%s' "$VLESS_PORT" | tr -d ' \t\r')
+    VLESS_PORT=${VLESS_PORT:-$DEFAULT_PORT}
+    if ! [[ "$VLESS_PORT" =~ ^[0-9]{1,5}$ ]] || [ "$VLESS_PORT" -lt 1 ] || [ "$VLESS_PORT" -gt 65535 ]; then
+        echo "端口必须是 1–65535 的数字，请重新输入。"
+        continue
+    fi
+    VLESS_PORT=$((10#$VLESS_PORT))
+    while :; do
+        read -r -p "使用端口 ${VLESS_PORT}？输入 y 确认 / n 重新输入： " PORT_CONFIRM
+        PORT_CONFIRM=$(printf '%s' "$PORT_CONFIRM" | tr -d ' \t\r')
+        case "$PORT_CONFIRM" in
+            y|Y|yes|YES) break 2;;
+            n|N|no|NO) break;;
+            *) echo "请输入 y 或 n。";;
+        esac
+    done
+done
 echo "使用端口：$VLESS_PORT"
 echo "===================================="
 
