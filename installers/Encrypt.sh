@@ -47,8 +47,12 @@ gen_uuid() {
 
 prompt() {
   var="$1"; text="$2"; def="${3:-}"
+  if [ -t 0 ]; then
+    python3 -c 'import termios; termios.tcflush(0, termios.TCIFLUSH)' || die "终端输入初始化失败。"
+  fi
   if [ -n "$def" ]; then printf "%s [%s]: " "$text" "$def"; else printf "%s: " "$text"; fi
-  read -r val || true
+  IFS= read -r val || die "无法读取终端输入，安装已停止。"
+  val=$(printf '%s' "$val" | tr -d '\r')
   [ -z "$val" ] && val="$def"
   eval "$var=\$val"
 }
