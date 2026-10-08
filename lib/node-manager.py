@@ -250,8 +250,12 @@ def generate_links(cfg,meta,indices=None):
                     if not ids or not re.fullmatch('[a-fA-F0-9]{0,16}',ids[0]) or len(ids[0])%2:raise Error('Short ID 无效。')
                     q.update(fp='chrome',pbk=public_key(tls['reality']['private_key']),sid=ids[0])
                     if u.get('flow'):q['flow']=u['flow']
-                elif is_alpine:q['insecure']=insecure
-                else:q['allowInsecure']=insecure
+                else:
+                    q['allowInsecure']='0'
+                    if insecure=='1':
+                        der=call(['openssl','x509','-in',tls['certificate_path'],'-outform','DER'])
+                        if not der:raise Error('证书读取失败，保留旧链接。')
+                        q['pcs']=hashlib.sha256(der).hexdigest()
             else:
                 uid=urllib.parse.quote(u['password'],safe='');scheme='hysteria2://';prefix='HY2';q={'sni':sni,'insecure':insecure}
             family=ipaddress.ip_address(ip).version

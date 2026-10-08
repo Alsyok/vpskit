@@ -285,7 +285,7 @@ make_self_signed_cert() {
   openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
     -keyout "$KEY_PATH" -out "$CERT_PATH" \
     -subj "/CN=${SNI}" \
-    -addext "subjectAltName=DNS:${SNI}" >/dev/null 2>&1
+    -addext "subjectAltName=DNS:${SNI}" -addext "basicConstraints=critical,CA:FALSE" -addext "extendedKeyUsage=serverAuth" >/dev/null 2>&1
 
   cp -f "$CERT_PATH" "$FULLCHAIN_PATH"
 }
@@ -668,6 +668,12 @@ def generate(cfg,meta):
                     if not ids or not re.fullmatch('[a-fA-F0-9]{0,16}',ids[0]) or len(ids[0])%2:raise RuntimeError('Reality ShortID 格式错误')
                     query.update(fp='chrome',pbk=public_key(tls['reality']['private_key']),sid=ids[0])
                     if user.get('flow'):query['flow']=user['flow']
+                else:
+                    der=run(['openssl','x509','-in',tls['certificate_path'],'-outform','DER']) if insecure=='1' else b''
+                    if insecure=='1' and not der:raise RuntimeError('证书读取失败，保留旧链接')
+                    query.pop('insecure',None)
+                    query['allowInsecure']='0'
+                    if insecure=='1':query['pcs']=hashlib.sha256(der).hexdigest()
                 prefix='VLESS-Reality' if reality else 'VLESS-TLS'
                 uri='vless://'+uid+'@'+host+':'+str(port)
             else:
@@ -931,9 +937,6 @@ echo "[i] TLS/HY2 分享主机：$TLS_SHARE_HOST"
 #################################
 LINKS_PATH="/etc/nodes/sing-box/links.txt"
 /usr/local/lib/alpine-node-sync/run --once || die "节点自检失败，保留旧链接；请检查核心和同步日志"
-VLESS_REALITY_LINK="$(sed -n '1p' "$LINKS_PATH")"
-VLESS_TLS_LINK="$(sed -n '2p' "$LINKS_PATH")"
-HY2_LINK="$(sed -n '3p' "$LINKS_PATH")"
 rc-update add alpine-node-sync default
 rc-service alpine-node-sync restart || rc-service alpine-node-sync start || die "后台自检服务启动失败"
 echo "[+] 已开启节点后台自检，验证成功后更新两个节点文件（约每 60 秒）"
@@ -964,11 +967,6 @@ echo "SNI：                ${TLS_SNI}"
 echo
 echo "UUID：               ${UUID}"
 echo "HY2 password：       ${HY2_PASSWORD}"
-echo
-echo "---- v2rayN 可导入链接（3条）----"
-echo "$VLESS_REALITY_LINK"
-echo "$VLESS_TLS_LINK"
-echo "$HY2_LINK"
 echo
 echo "已写入：$LINKS_PATH"
 echo "查询节点：cat /etc/nodes/sing-box/links.txt"

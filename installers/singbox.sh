@@ -838,7 +838,7 @@ else
     -keyout "$CERT_DIR/privkey.pem" \
     -out "$CERT_DIR/fullchain.pem" \
     -subj "/CN=$DOMAIN" \
-    -addext "subjectAltName = $SAN"
+    -addext "subjectAltName = $SAN" -addext "basicConstraints=critical,CA:FALSE" -addext "extendedKeyUsage=serverAuth"
 
   chmod 644 \
     "$CERT_DIR/fullchain.pem" \
@@ -1223,7 +1223,12 @@ def generate(cfg,meta):
                     ids=tls['reality'].get('short_id',[])
                     if not ids or not re.fullmatch('[a-fA-F0-9]{0,16}',ids[0]) or len(ids[0])%2:raise RuntimeError('Reality ShortID 格式错误')
                     query.update(fp='chrome',pbk=public_key(tls['reality']['private_key']),sid=ids[0],type='tcp',flow=user.get('flow',''))
-                else:query.update(allowInsecure=insecure,type='tcp')
+                else:
+                    query.update(allowInsecure='0',type='tcp')
+                    if insecure=='1':
+                        der=run(['openssl','x509','-in',tls['certificate_path'],'-outform','DER'])
+                        if not der:raise RuntimeError('证书读取失败，保留旧链接')
+                        query['pcs']=hashlib.sha256(der).hexdigest()
                 uri='vless://'+uid+'@'+host_br+':'+str(port)
             else:
                 password=user.get('password','')
@@ -1426,172 +1431,6 @@ check_port \
 SUB_FILE="/etc/nodes/sing-box/links.txt"
 mkdir -p /etc/nodes/sing-box
 chmod 700 /etc/nodes /etc/nodes/sing-box
-SUB_STAGE=$(mktemp /etc/nodes/sing-box/.links.install.XXXXXX)
-chmod 600 "$SUB_STAGE"
-trap 'rm -f "$SUB_STAGE"' EXIT
-: > "$SUB_STAGE"
-
-print_nodes() {
-
-  local TAG="$1"
-  local HOST_RAW="$2"
-  local HOST_BR="$3"
-  local VP="$4"
-  local RP="$5"
-  local HP="$6"
-  local INS="$7"
-
-  local COUNTRY_IP
-  if [[ "$TAG" == *V6* ]]; then COUNTRY_IP="${SERVER_IPV6:-${SERVER_IPV4:-}}"
-  else COUNTRY_IP="${SERVER_IPV4:-${SERVER_IPV6:-}}"; fi
-  local TLS_NAME REALITY_NAME HY2_NAME
-  TLS_NAME=$("$NODE_SYNC_BIN" --label "VLESS-TLS-${TAG}-${HOST_RAW}" "$COUNTRY_IP")
-  REALITY_NAME=$("$NODE_SYNC_BIN" --label "VLESS-REALITY-${TAG}-${HOST_RAW}" "$COUNTRY_IP")
-  HY2_NAME=$("$NODE_SYNC_BIN" --label "HY2-${TAG}-${HOST_RAW}" "$COUNTRY_IP")
-
-  local VLESS_URI_LOCAL
-
-  VLESS_URI_LOCAL="vless://${UUID}@${HOST_BR}:${VP}?encryption=none&security=tls&sni=${DOMAIN}&allowInsecure=${INS}&type=tcp#${TLS_NAME}"
-
-  local VLESS_REALITY_URI_LOCAL
-
-  VLESS_REALITY_URI_LOCAL="vless://${UUID}@${HOST_BR}:${RP}?encryption=none&security=reality&sni=${REALITY_SNI}&fp=chrome&pbk=${REALITY_PUBLIC_KEY}&sid=${REALITY_SHORT_ID}&type=tcp&flow=xtls-rprx-vision#${REALITY_NAME}"
-
-  local HY2_URI_LOCAL
-
-  HY2_URI_LOCAL="hysteria2://${HY2_PASS}@${HOST_BR}:${HP}?insecure=${INS}&sni=${DOMAIN}#${HY2_NAME}"
-
-  # ----------------------------------------------------------
-  # VLESS-TLS
-  # ----------------------------------------------------------
-
-  log ""
-  log "=================== [$TAG] VLESS-TLS ==================="
-
-  echo "$VLESS_URI_LOCAL"
-
-  if command -v qrencode >/dev/null 2>&1; then
-    echo "$VLESS_URI_LOCAL" |
-      qrencode -t ansiutf8 ||
-      true
-  fi
-
-  # ----------------------------------------------------------
-  # VLESS-REALITY
-  # ----------------------------------------------------------
-
-  log ""
-  log "=================== [$TAG] VLESS-REALITY ==================="
-
-  echo "$VLESS_REALITY_URI_LOCAL"
-
-  if command -v qrencode >/dev/null 2>&1; then
-    echo "$VLESS_REALITY_URI_LOCAL" |
-      qrencode -t ansiutf8 ||
-      true
-  fi
-
-  # ----------------------------------------------------------
-  # Hysteria2
-  # ----------------------------------------------------------
-
-  log ""
-  log "=================== [$TAG] Hysteria2 ==================="
-
-  echo "$HY2_URI_LOCAL"
-
-  if command -v qrencode >/dev/null 2>&1; then
-    echo "$HY2_URI_LOCAL" |
-      qrencode -t ansiutf8 ||
-      true
-  fi
-
-  # ----------------------------------------------------------
-  # 写入订阅文件
-  # ----------------------------------------------------------
-
-  {
-    echo ""
-    echo "# ===== ${TAG} ====="
-    echo "$VLESS_URI_LOCAL"
-    echo "$VLESS_REALITY_URI_LOCAL"
-    echo "$HY2_URI_LOCAL"
-  } >> "$SUB_STAGE"
-}
-
-# ============================================================
-# 模式1：域名
-# ============================================================
-
-if [[ "$MODE" == "1" ]]; then
-
-  print_nodes \
-    "DOMAIN-V4PORT" \
-    "$DOMAIN" \
-    "$DOMAIN" \
-    "$VLESS_PORT" \
-    "$VLESS_R_PORT" \
-    "$HY2_PORT" \
-    "0"
-
-  print_nodes \
-    "DOMAIN-V6PORT" \
-    "$DOMAIN" \
-    "$DOMAIN" \
-    "$VLESS6_PORT" \
-    "$VLESS_R6_PORT" \
-    "$HY2_6_PORT" \
-    "0"
-
-# ============================================================
-# 模式2：公网 IP
-# ============================================================
-
-else
-
-  any=0
-
-  if [[ -n "${SERVER_IPV4:-}" ]]; then
-
-    print_nodes \
-      "V4" \
-      "$SERVER_IPV4" \
-      "$SERVER_IPV4" \
-      "$VLESS_PORT" \
-      "$VLESS_R_PORT" \
-      "$HY2_PORT" \
-      "1"
-
-    any=1
-
-  fi
-
-  if [[ -n "${SERVER_IPV6:-}" ]]; then
-
-    print_nodes \
-      "V6" \
-      "$SERVER_IPV6" \
-      "[$SERVER_IPV6]" \
-      "$VLESS6_PORT" \
-      "$VLESS_R6_PORT" \
-      "$HY2_6_PORT" \
-      "1"
-
-    any=1
-
-  fi
-
-  if [[ "$any" -eq 0 ]]; then
-
-    log "[✖] 未检测到可用公网 IP"
-    log "[✖] 无法生成节点链接"
-
-    exit 1
-
-  fi
-
-fi
-
 # 首次输出及后续更新均由同一生成器完成；验证失败不覆盖旧文件。
 if "$NODE_SYNC_BIN" --once; then
   log "[✔] 已验证并保存最新节点：$SUB_FILE"
@@ -1629,9 +1468,7 @@ log "[✔] 已启用每 60 秒后台检查与开机启动"
 # ============================================================
 
 log ""
-log "=================== 订阅文件内容 ==================="
-
-cat "$SUB_FILE"
+log "节点链接将在统一命名的节点链接处显示。"
 
 log ""
 log "节点链接已保存到：$SUB_FILE"
