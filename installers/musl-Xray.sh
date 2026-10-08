@@ -275,8 +275,6 @@ printf '%s\n' '* * * * * /usr/local/lib/xray-node-sync/run --once >> /var/log/xr
 crontab "$CRON_STAGE"
 rm -f "$CRON_STAGE"
 echo "========================="
-echo "VLESS 节点链接："
-cat /etc/nodes/xray/links.txt
 echo "节点链接：/etc/nodes/xray/links.txt"
 echo "合并订阅：/etc/nodes/subscription.txt"
 echo "配置路径：/etc/xray/config.json"
