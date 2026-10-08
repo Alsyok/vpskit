@@ -60,8 +60,11 @@ fi
 detect
 . "$VPSKIT_ROOT/lib/node-services.sh"
 prepare_node_publication
+VPSKIT_VERSION=$(cat "$VPSKIT_ROOT/VERSION")
 while :; do
-    printf '\n%s  【 VPSKit · 服务器工具箱 】%s\n' "$C_CYAN" "$C_RESET"; rule
+    printf '\n%s  【 VPSKit · 服务器工具箱 】 v%s%s\n' "$C_CYAN" "$VPSKIT_VERSION" "$C_RESET"
+    printf '  %s系统：%s%s\n' "$C_DIM" "${PRETTY_NAME:-$ID}" "$C_RESET"
+    rule
     menu_item "$C_CYAN" '1.' 'ARGO · 隧道与节点管理'
     menu_item "$C_INSTALL" '2.' 'Singbox 一键安装'
     menu_item "$C_BLUE" '3.' 'Xray 一键安装'
