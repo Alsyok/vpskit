@@ -256,7 +256,10 @@ def generate_links(cfg,meta,indices=None):
                     if not der:raise Error('证书读取失败，保留旧链接。')
                     q['pcs']=hashlib.sha256(der).hexdigest()
             else:
-                uid=urllib.parse.quote(u['password'],safe='');scheme='hysteria2://';prefix='HY2';q={'sni':sni,'insecure':insecure}
+                uid=urllib.parse.quote(u['password'],safe='');scheme='hysteria2://';prefix='HY2'
+                der=call(['openssl','x509','-in',tls['certificate_path'],'-outform','DER'])
+                if not der:raise Error('证书读取失败，保留旧链接。')
+                q={'sni':sni,'insecure':'0','pinSHA256':hashlib.sha256(der).hexdigest()}
             family=ipaddress.ip_address(ip).version
             suffix=geo(ip);label=prefix+'-V'+str(family)+'PORT-'+host+('-'+suffix if suffix else '')
             lines.append(scheme+uid+'@'+host+':'+str(p)+'?'+urllib.parse.urlencode(q,quote_via=urllib.parse.quote)+'#'+urllib.parse.quote(label,safe=''))
@@ -835,10 +838,11 @@ def group_input(label,values,validate=lambda v:v,generate=None,secret=False):
         try:return generate() if generate and value.lower()=='g' else validate(value)
         except (Error,ValueError):say('↻ 输入格式无效，请重新输入。','retry')
 
+def valid_port(v):
+    if not v.isdigit() or not 1<=int(v)<=65535:raise Error('端口应为 1–65535。')
+    return int(v)
+
 def edit_listen_ports(targets):
-    def valid_port(v):
-        if not v.isdigit() or not 1<=int(v)<=65535:raise Error('端口应为 1–65535。')
-        return int(v)
     for target in targets:
         family=ipaddress.ip_address(target.get('listen','::')).version
         label='IPv'+str(family)+' 监听端口'

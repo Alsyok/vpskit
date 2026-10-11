@@ -377,3 +377,16 @@ class InstallCancelAndPortTests(unittest.TestCase):
   self.assertEqual([t['listen_port'] for t in targets],[30001,38997]);self.assertIn('IPv4',labels[0]);self.assertIn('IPv6',labels[1])
   answers=iter(['0','40002']);ns['say']=lambda *a:None
   ns['edit_listen_ports']([targets[1]]);self.assertEqual(targets[1]['listen_port'],40002)
+
+class RealityPortRegressionTests(unittest.TestCase):
+ def test_reality_edit_reaches_confirmation_after_ports(self):
+  ns=namespace(ROOT/'lib/node-manager.py')
+  with tempfile.TemporaryDirectory() as tmp:
+   cfg={'inbounds':[{'type':'vless','listen':'::','listen_port':32981,'users':[{'uuid':'7bd86e44-7eaf-4815-855d-58079c65ca96'}],'tls':{'server_name':'www.yahoo.com','reality':{'enabled':True,'handshake':{'server':'www.yahoo.com','server_port':443},'short_id':['12345678'],'private_key':'test'}}}]}
+   path=pathlib.Path(tmp)/'config.json';path.write_text(json.dumps(cfg))
+   answers=iter(['','32983','','','',''])
+   confirmed=[]
+   ns.update(CONFIG=path,config=lambda:cfg,select_inbounds=lambda *a:[0],title=lambda *a:None,say=lambda *a:None,prompt=lambda *a,**k:next(answers),choose=lambda *a,**k:'1',confirm=lambda *a:(confirmed.append(True),False)[1])
+   ns['edit_node']('reality');self.assertEqual(confirmed,[True]);self.assertEqual(json.loads(path.read_text()),cfg)
+   self.assertEqual(ns['valid_port']('443'),443)
+   with self.assertRaises(ns['Error']):ns['valid_port']('65536')

@@ -26,3 +26,23 @@ class SingboxPinTests(unittest.TestCase):
 
    ns['generate_links'].__globals__['cert_kind']=lambda p:'formal'
    self.assertIn('pcs='+expected,ns['generate_links'](cfg,meta))
+
+class Hy2PinTests(unittest.TestCase):
+ def test_hy2_pin_for_formal_self_and_replacement(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   cert=pathlib.Path(tmp)/'cert.pem';key=pathlib.Path(tmp)/'key.pem';previous=None
+   for generation in range(2):
+    subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=test.example','-keyout',str(key),'-out',str(cert)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    expected=hashlib.sha256(subprocess.check_output(['openssl','x509','-in',str(cert),'-outform','DER'])).hexdigest()
+    self.assertNotEqual(expected,previous);previous=expected
+    cfg={'inbounds':[{'type':'hysteria2','listen':'0.0.0.0','listen_port':23456,'users':[{'password':'test pass'}],'tls':{'enabled':True,'server_name':'test.example','certificate_path':str(cert)}}]}
+    for filename in ('Encrypt.sh','singbox.sh','manager'):
+     if filename=='manager':
+      ns=runpy.run_path(str(ROOT/'lib/node-manager.py'),run_name='test');fn=ns['generate_links'];ns=fn.__globals__;ns.update(alpine=lambda:True,geo=lambda ip:'')
+     else:
+      code=re.search(r"<<'NODE_SYNC_PY'\n(.*?)\nNODE_SYNC_PY",(ROOT/'installers'/filename).read_text(),re.S).group(1);ns={'__name__':'test'};exec(code,ns);ns['country']=lambda ip:'';fn=ns['generate']
+     for kind,mode in [('self','2'),('formal','1')]:
+      ns['cert_kind']=lambda path:kind
+      link=next(line for line in fn(cfg,dict(mode=mode,ipv4='192.0.2.1')).splitlines() if line.startswith('hysteria2://'))
+      q=urllib.parse.parse_qs(urllib.parse.urlsplit(link).query)
+      self.assertEqual(q['pinSHA256'],[expected]);self.assertEqual(q['insecure'],['0']);self.assertNotIn('pcs',q)

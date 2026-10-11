@@ -1236,7 +1236,9 @@ def generate(cfg,meta):
                 password=user.get('password','')
                 if not password:raise RuntimeError('HY2 密码为空')
                 prefix='HY2';uri='hysteria2://'+urllib.parse.quote(password,safe='')+'@'+host_br+':'+str(port)
-                query={'insecure':insecure,'sni':sni}
+                der=run(['openssl','x509','-in',tls['certificate_path'],'-outform','DER'])
+                if not der:raise RuntimeError('证书读取失败，保留旧链接')
+                query={'sni':sni,'insecure':'0','pinSHA256':hashlib.sha256(der).hexdigest()}
             lines += ['# ===== '+tag+' '+prefix+' =====',uri+'?'+urllib.parse.urlencode(query,quote_via=urllib.parse.quote)+'#'+node_name(prefix+'-'+tag+'-'+host,ip_for(tag,meta)),'']
     if not lines:raise RuntimeError('未生成有效节点，保留旧文件')
     return '\n'.join(lines)+'\n'
