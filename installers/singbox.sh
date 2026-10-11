@@ -1,4 +1,15 @@
 #!/bin/bash
+if [ -n "${VPSKIT_HTTP_HELPER:-}" ] && [ -f "$VPSKIT_HTTP_HELPER" ]; then
+    . "$VPSKIT_HTTP_HELPER"
+else
+    vpskit_http_run() { "$@"; }
+fi
+# VPSKit supplies an interactive APT recovery helper; standalone use keeps apt defaults.
+if [ -n "${VPSKIT_APT_HELPER:-}" ] && [ -f "$VPSKIT_APT_HELPER" ]; then
+    . "$VPSKIT_APT_HELPER"
+else
+    vpskit_apt_update() { apt-get update "$@"; }
+fi
 
 # ⚠️ 免责声明：
 # 本脚本仅供学习与技术研究使用。
@@ -194,7 +205,7 @@ if [[ ${#MISSING_CMDS[@]} -gt 0 ]]; then
   case "$PKG_MGR" in
 
     apt)
-      apt-get update -y
+      vpskit_apt_update
       DEBIAN_FRONTEND=noninteractive \
         apt-get install -y "${INSTALL_PACKAGES[@]}"
       ;;
@@ -233,6 +244,18 @@ else
 
   log "[✔] 依赖齐全，无需安装。"
 
+fi
+
+[[ "${VPSKIT_PREFLIGHT_ONLY:-0}" != 1 ]] || exit 0
+
+if [[ -z "$SERVER_IPV4" && -z "$SERVER_IPV6" ]]; then
+  while :; do
+    read -r -p "公网 IP 检测失败，请输入连接 IP（0 返回）： " MANUAL_IP
+    [[ "$MANUAL_IP" != 0 ]] || exit 20
+    MANUAL_FAMILY=$(python3 -c 'import ipaddress,sys; print(ipaddress.ip_address(sys.argv[1]).version)' "$MANUAL_IP" 2>/dev/null) || { echo "请输入有效 IP。"; continue; }
+    if [[ "$MANUAL_FAMILY" == 4 ]]; then SERVER_IPV4="$MANUAL_IP"; else SERVER_IPV6="$MANUAL_IP"; fi
+    break
+  done
 fi
 
 # ============================================================
@@ -713,7 +736,7 @@ if ! (
     rm -rf "$ACME_SRC"
     rm -f "$ACME_TGZ"
 
-    source "$HOME/.bashrc" 2>/dev/null || true
+    # acme.sh 使用绝对路径，无需读取用户的交互终端配置。
 
   fi
 
@@ -788,7 +811,7 @@ if ! (
 
     fi
 
-    "$HOME/.acme.sh/acme.sh" \
+    vpskit_http_run "$HOME/.acme.sh/acme.sh" \
       --issue \
       -d "$DOMAIN" \
       --standalone \
@@ -1199,7 +1222,7 @@ def listens(pid,cfg):
             available.add(('tcp' if table.startswith('tcp') else 'udp',int(fields[1].split(':')[-1],16)))
     for inbound in cfg.get('inbounds',[]):
         kind=inbound.get('type')
-        if kind not in ['vless','hysteria2']:raise RuntimeError('出现非原脚本支持的入站，未覆盖节点文件')
+        if kind not in ['vless','hysteria2']:continue
         protocol='udp' if kind=='hysteria2' else 'tcp'
         port=inbound.get('listen_port')
         if not isinstance(port,int) or not 1<=port<=65535 or (protocol,port) not in available:raise RuntimeError('入站端口尚未由当前核心监听')

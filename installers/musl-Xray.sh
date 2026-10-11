@@ -21,9 +21,13 @@ DOMAIN="kyn.com"
 
 # 客户端实际连接用的公网 IP（请改成你的真实 IP）
 command -v curl >/dev/null 2>&1 || apk add --no-cache curl ca-certificates
-CONNECT_ADDR=$(curl -fLsS --connect-timeout 5 --max-time 10 https://api.ipify.org || curl -fLsS --connect-timeout 5 --max-time 10 https://ipv4.icanhazip.com)
+CONNECT_ADDR=$(curl -fLsS --connect-timeout 5 --max-time 10 https://api.ipify.org || curl -fLsS --connect-timeout 5 --max-time 10 https://ipv4.icanhazip.com || true)
 CONNECT_ADDR=$(printf '%s' "$CONNECT_ADDR" | tr -d ' \r\n')
 
+while ! python3 -c 'import ipaddress,sys; ipaddress.ip_address(sys.argv[1])' "$CONNECT_ADDR" 2>/dev/null; do
+    read -r -p "公网 IP 检测失败，请输入连接 IP（0 返回）： " CONNECT_ADDR
+    [ "$CONNECT_ADDR" != 0 ] || exit 20
+done
 # 检查 root
 if [ "$(id -u)" != "0" ]; then
     echo "请使用 root 执行"
@@ -193,10 +197,11 @@ def generate(cfg,meta):
     for inbound in cfg.get('inbounds',[]):
         stream=inbound.get('streamSettings',{})
         if inbound.get('protocol')!='vless' or stream.get('security')!='tls' or stream.get('network','tcp') not in ('tcp','raw'):
-            raise RuntimeError('仅支持这些安装脚本的 VLESS TCP TLS 配置')
+            continue
         port=int(inbound['port']);sni=stream['tlsSettings']['serverName']
         if not 1<=port<=65535 or not sni:raise RuntimeError('端口或 SNI 无效')
-        host=sni if meta['domain_mode'] else ip
+        certfile=stream['tlsSettings'].get('certificates',[{}])[0].get('certificateFile','')
+        host=sni if meta.get('certificate_modes',{}).get(certfile,meta.get('domain_mode',False)) else ip
         if re.search(r'[\s/@?#]',host):raise RuntimeError('节点地址无效')
         host_uri='['+host+']' if ':' in host else host
         params=dict(type='tcp',encryption='none',security='tls',sni=sni,allowInsecure='0')

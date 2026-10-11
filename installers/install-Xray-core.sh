@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+if [ -n "${VPSKIT_HTTP_HELPER:-}" ] && [ -f "$VPSKIT_HTTP_HELPER" ]; then
+    . "$VPSKIT_HTTP_HELPER"
+else
+    vpskit_http_run() { "$@"; }
+fi
 set -eu
 [ -x /usr/local/lib/argo-node-files/run ] || { echo "请通过完整 VPSKit 安装入口运行。" >&2; exit 1; }
 umask 077
@@ -19,8 +24,12 @@ DEFAULT_PORT=443
 DEFAULT_FAKE_DOMAIN="kyn.com"
 
 command -v curl >/dev/null 2>&1 || apk add --no-cache curl ca-certificates
-CONNECT_ADDR=$(curl -fLsS --connect-timeout 5 --max-time 10 https://api.ipify.org || curl -fLsS --connect-timeout 5 --max-time 10 https://ipv4.icanhazip.com)
+CONNECT_ADDR=$(curl -fLsS --connect-timeout 5 --max-time 10 https://api.ipify.org || curl -fLsS --connect-timeout 5 --max-time 10 https://ipv4.icanhazip.com || true)
 CONNECT_ADDR=$(printf '%s' "$CONNECT_ADDR" | tr -d ' \r\n')
+while ! python3 -c 'import ipaddress,sys; ipaddress.ip_address(sys.argv[1])' "$CONNECT_ADDR" 2>/dev/null; do
+    read -r -p "公网 IP 检测失败，请输入连接 IP（0 返回）： " CONNECT_ADDR
+    [ "$CONNECT_ADDR" != 0 ] || exit 20
+done
 
 # Root check
 if [ "$(id -u)" != "0" ]; then
@@ -34,16 +43,23 @@ echo "当前公网 IP：$CONNECT_ADDR"
 echo "证书模式："
 echo "  1) 有域名（自动申请 Let's Encrypt）"
 echo "  2) 无域名（自签证书）"
-read -p "请选择 [1/2，默认 2]： " MODE
-[ -z "$MODE" ] && MODE=2
+while :; do
+    read -r -p "请选择 [1/2，默认 2；0 返回]： " MODE
+    MODE=${MODE:-2}
+    case "$MODE" in 1|2) break;; 0) exit 20;; *) echo "请输入 0、1 或 2。";; esac
+ done
 
 USE_DOMAIN=0
 DOMAIN=""
 
 if [ "$MODE" = "1" ]; then
     USE_DOMAIN=1
-    read -p "请输入已解析到本机 IP 的域名： " DOMAIN
-    [ -z "$DOMAIN" ] && { echo "域名不能为空"; exit 1; }
+    while :; do
+        read -r -p "请输入已解析到本机 IP 的域名（0 返回）： " DOMAIN
+        [ "$DOMAIN" != 0 ] || exit 20
+        [[ "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ && "$DOMAIN" != *..* && "$DOMAIN" == *.* ]] && break
+        echo "请输入有效域名。"
+    done
     echo "将使用域名：$DOMAIN"
 else
     DOMAIN="$DEFAULT_FAKE_DOMAIN"
@@ -51,16 +67,12 @@ else
 fi
 
 # 端口输入
-read -p "请输入 VLESS 端口 [默认 $DEFAULT_PORT]： " VLESS_PORT
-[ -z "$VLESS_PORT" ] && VLESS_PORT=$DEFAULT_PORT
-
-if ! echo "$VLESS_PORT" | grep -Eq '^[0-9]+$'; then
-    echo "端口必须是数字"
-    exit 1
-fi
-
-[ "$VLESS_PORT" -ge 1 ] && [ "$VLESS_PORT" -le 65535 ] || { echo '端口必须在 1–65535 之间'; exit 1; }
-[[ "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ && "$DOMAIN" != *..* ]] || { echo '域名格式无效'; exit 1; }
+while :; do
+    read -r -p "请输入 VLESS 端口 [默认 $DEFAULT_PORT]： " VLESS_PORT
+    VLESS_PORT=${VLESS_PORT:-$DEFAULT_PORT}
+    if [[ "$VLESS_PORT" =~ ^[0-9]{1,5}$ ]] && [ "$VLESS_PORT" -ge 1 ] && [ "$VLESS_PORT" -le 65535 ]; then break; fi
+    echo "端口必须为 1–65535，请重新输入。"
+done
 mkdir -p "$CONFIG_DIR" "$CERT_DIR"
 
 apk update
@@ -78,7 +90,7 @@ if [ "$USE_DOMAIN" -eq 1 ]; then
     export PATH="$HOME/.acme.sh:$PATH"
 
     echo "申请 Let's Encrypt 证书..."
-    $HOME/.acme.sh/acme.sh --issue --standalone --server letsencrypt --keylength ec-256 -d "$DOMAIN" --force
+    vpskit_http_run "$HOME/.acme.sh/acme.sh" --issue --standalone --server letsencrypt --keylength ec-256 -d "$DOMAIN" --force
     $HOME/.acme.sh/acme.sh --install-cert --ecc -d "$DOMAIN" \
         --key-file "$CERT_DIR/server.key" \
         --fullchain-file "$CERT_DIR/server.crt" \
@@ -227,10 +239,11 @@ def generate(cfg,meta):
     for inbound in cfg.get('inbounds',[]):
         stream=inbound.get('streamSettings',{})
         if inbound.get('protocol')!='vless' or stream.get('security')!='tls' or stream.get('network','tcp') not in ('tcp','raw'):
-            raise RuntimeError('仅支持这些安装脚本的 VLESS TCP TLS 配置')
+            continue
         port=int(inbound['port']);sni=stream['tlsSettings']['serverName']
         if not 1<=port<=65535 or not sni:raise RuntimeError('端口或 SNI 无效')
-        host=sni if meta['domain_mode'] else ip
+        certfile=stream['tlsSettings'].get('certificates',[{}])[0].get('certificateFile','')
+        host=sni if meta.get('certificate_modes',{}).get(certfile,meta.get('domain_mode',False)) else ip
         if re.search(r'[\s/@?#]',host):raise RuntimeError('节点地址无效')
         host_uri='['+host+']' if ':' in host else host
         params=dict(type='tcp',encryption='none',security='tls',sni=sni,allowInsecure='0')

@@ -28,7 +28,7 @@ if [[ ! -f "$VPSKIT_ROOT/lib/common.sh" ]]; then
         curl -fLsS --connect-timeout 15 --max-time 120 "$VPSKIT_BASE_URL/$file" -o "$stage/$file"
     done < "$stage/manifest.sha256"
     (cd "$stage" && sha256sum -c manifest.sha256 >/dev/null)
-    for required in vpskit.sh lib/common.sh lib/bbr.sh lib/node-services.sh lib/standalone.sh lib/node-manager.py lib/subscription-manager.py lib/subscription-cert-sync.py lib/node-files.py modules/CFtunnel.sh modules/singbox-manager.sh modules/xray-manager.sh modules/subscription-manager.sh modules/cert-manager.sh modules/tools.sh installers/singbox.sh installers/Encrypt.sh installers/musl-Xray.sh installers/install-Xray-core.sh installers/install_subscription.sh; do
+    for required in vpskit.sh lib/common.sh lib/apt-retry.sh lib/http-guard.sh lib/bbr.sh lib/node-services.sh lib/standalone.sh lib/node-manager.py lib/subscription-manager.py lib/subscription-cert-sync.py lib/node-files.py modules/CFtunnel.sh modules/singbox-manager.sh modules/xray-manager.sh modules/subscription-manager.sh modules/cert-manager.sh modules/tools.sh installers/singbox.sh installers/Encrypt.sh installers/musl-Xray.sh installers/install-Xray-core.sh installers/install_subscription.sh; do
         [[ -s "$stage/$required" ]] || { echo '下载包缺少必要文件。' >&2; exit 1; }
     done
     bash -n "$stage/vpskit.sh"

@@ -1,6 +1,11 @@
 #!/bin/sh
 # Cloudflare Tunnel manager: Alpine/OpenRC and Debian/systemd
 set -eu
+VPSKIT_APT_HELPER="$VPSKIT_ROOT/lib/apt-retry.sh"
+VPSKIT_HTTP_HELPER="$VPSKIT_ROOT/lib/http-guard.sh"
+export VPSKIT_HTTP_HELPER
+export VPSKIT_APT_HELPER
+. "$VPSKIT_APT_HELPER"
 VERSION=2.4.9
 BASE=/etc/vps-tunnel
 BIN=/usr/local/lib/vps-tunnel/cloudflared
@@ -66,7 +71,7 @@ ask() {
     esac
     while :; do
         IFS= read -r REPLY || exit 0
-        REPLY=$(printf '%s' "$REPLY" | tr -d '\r')
+        REPLY=${REPLY%"$(printf '\r')"}
         case "$1" in
             '请选择 ['*|'选择安装方式：'*)
                 REPLY=$(printf '%s' "$REPLY" | tr -d ' \t')
@@ -74,7 +79,7 @@ ask() {
         esac
         break
     done
-    REPLY=$(printf '%s' "$REPLY" | tr -d '\r')
+    REPLY=${REPLY%"$(printf '\r')"}
 }
 menu_item() { printf '  %s%3s%s  %s%s%s\n' "$C_WHITE" "$2" "$C_RESET" "$1" "$3" "$C_RESET"; }
 detect() {
@@ -95,16 +100,16 @@ dependencies() {
     if [ "$MANAGER" = openrc ]; then
         apk add --no-cache curl ca-certificates jq tar unzip gcompat
     else
-        apt-get update
+        vpskit_apt_update
         apt-get install -y curl ca-certificates jq tar unzip
     fi
 }
 confirmed() {
     while :; do
-        confirm_reply=$(printf '%s' "$REPLY" | tr -d ' \t\r' | tr 'a-z' 'A-Z')
+        confirm_reply=$REPLY
         case "$confirm_reply" in
-            YES|Y) return 0;;
-            NO|N) return 1;;
+            YES|yes|Yes|Y|y) return 0;;
+            NO|no|No|N|n) return 1;;
             *) retry_input '请输入 “YES/y” 继续，或 “NO/n” 取消。'
                ask '输入 “YES/y” 继续，“NO/n” 取消：';;
         esac
@@ -167,6 +172,6 @@ show_subscription() {
 ensure_shell_tools() {
     if ! command -v bash >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
         if [ "$MANAGER" = openrc ]; then apk add --no-cache bash curl ca-certificates;
-        else apt-get update; apt-get install -y bash curl ca-certificates; fi
+        else vpskit_apt_update; apt-get install -y bash curl ca-certificates; fi
     fi
 }

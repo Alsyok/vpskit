@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# VPSKit supplies an interactive APT recovery helper; standalone use keeps apt defaults.
+if [ -n "${VPSKIT_APT_HELPER:-}" ] && [ -f "$VPSKIT_APT_HELPER" ]; then
+    . "$VPSKIT_APT_HELPER"
+else
+    vpskit_apt_update() { apt-get update "$@"; }
+fi
 
 set -Eeuo pipefail
 
@@ -108,7 +114,7 @@ install_dependencies() {
         apt)
             export DEBIAN_FRONTEND=noninteractive
 
-            apt-get update
+            vpskit_apt_update
 
             apt-get install -y \
                 python3 \

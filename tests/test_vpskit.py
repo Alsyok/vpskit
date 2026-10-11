@@ -29,7 +29,9 @@ class SyntaxTests(unittest.TestCase):
   self.assertNotIn('ARGO_STANDALONE_PY',text)
   for file in ('Encrypt.sh','singbox.sh'):
    ns=namespace(ROOT/'lib/node-manager.py');source=body(ROOT/'installers'/file,'NODE_SYNC_PY')
-   updated=ns['current_sync_source'](source);compile(updated,file,'exec');self.assertEqual(updated,ns['current_sync_source'](updated))
+   with tempfile.TemporaryDirectory() as tmp:
+    ns['LIB']=pathlib.Path(tmp);(ns['LIB']/'singbox-worker.py').write_text(source)
+    updated=ns['fresh_sync_source']();compile(updated,file,'exec');self.assertEqual(updated,source)
    self.assertNotIn("OUTPUT=pathlib.Path('/root/singbox_nodes.txt')",updated)
 class FreshStartupTests(unittest.TestCase):
  def test_startup_does_not_migrate_old_workers(self):
@@ -38,7 +40,7 @@ class FreshStartupTests(unittest.TestCase):
    self.assertNotIn('migrate_installed',source)
    self.assertNotIn('sync-publication.py',source)
   ns=namespace(ROOT/'lib/node-manager.py')
-  with self.assertRaises(ns['Error']):ns['current_sync_source']('def old_sync():pass')
+  self.assertNotIn('这是旧版同步程序', (ROOT/'lib/node-manager.py').read_text())
   self.assertNotIn('var/backups/vpskit', (ROOT/'lib/node-manager.py').read_text())
 class MobileMenuTests(unittest.TestCase):
  def test_blank_crlf_and_invalid_selection(self):
@@ -134,7 +136,7 @@ class EditTests(unittest.TestCase):
     else:
      ns['xedit']();new=json.loads(ns['XCONFIG'].read_text());self.assertEqual(new['inbounds'][0]['port'],9443);self.assertEqual(new['inbounds'][1]['port'],8443)
      self.assertTrue(all(i['streamSettings']['tlsSettings']['serverName']=='new.example' for i in new['inbounds']))
-     self.assertTrue(json.loads(ns['XSTATE'].read_text())['domain_mode'])
+     self.assertTrue(json.loads(ns['XSTATE'].read_text())['certificate_modes']['/cert/new.pem'])
  def test_certificate_switch_xray_and_rollback(self):
   for fail in (False,True):
    ns=namespace(ROOT/'lib/node-manager.py')
@@ -386,7 +388,22 @@ class RealityPortRegressionTests(unittest.TestCase):
    path=pathlib.Path(tmp)/'config.json';path.write_text(json.dumps(cfg))
    answers=iter(['','32983','','','',''])
    confirmed=[]
-   ns.update(CONFIG=path,config=lambda:cfg,select_inbounds=lambda *a:[0],title=lambda *a:None,say=lambda *a:None,prompt=lambda *a,**k:next(answers),choose=lambda *a,**k:'1',confirm=lambda *a:(confirmed.append(True),False)[1])
+   ns.update(fresh_sync_source=lambda:'',CONFIG=path,config=lambda:cfg,select_inbounds=lambda *a:[0],title=lambda *a:None,say=lambda *a:None,prompt=lambda *a,**k:next(answers),choose=lambda *a,**k:'1',confirm=lambda *a:(confirmed.append(True),False)[1])
    ns['edit_node']('reality');self.assertEqual(confirmed,[True]);self.assertEqual(json.loads(path.read_text()),cfg)
    self.assertEqual(ns['valid_port']('443'),443)
    with self.assertRaises(ns['Error']):ns['valid_port']('65536')
+
+class WorkerReplacementTests(unittest.TestCase):
+ def test_old_worker_replaced_without_classification(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   root=pathlib.Path(tmp)
+   source=(ROOT/'lib/node-manager.py').read_text().replace('/usr/local/lib/',str(root/'lib')+'/')
+   ns={'__name__':'test'};exec(source,ns)
+   lib=root/'lib/argo-standalone';lib.mkdir(parents=True)
+   (lib/'singbox-worker.py').write_text(body(ROOT/'installers/singbox.sh','NODE_SYNC_PY'))
+   worker=root/'lib/singbox-node-sync/run';worker.parent.mkdir();worker.write_bytes(b'old third party worker\xff')
+   meta=root/'meta.json';meta.write_text(json.dumps({'ipv4':'192.0.2.1','binary':'/fake'}))
+   ns.update(LIB=lib,SYNC=lib/'node-sync.py',META=meta,config=lambda:{},binary=lambda:'/fake',verify_service_config=lambda:None,management_lock=__import__('contextlib').nullcontext,alpine=lambda:False)
+   ns['initialize_sync']()
+   updated=worker.read_text();compile(updated,'worker','exec')
+   self.assertIn('VPSKIT_SHARED_PUBLICATION',updated);self.assertIn('ARGO_CERT_GENERATOR',updated);self.assertNotIn('old third party',updated)

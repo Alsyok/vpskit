@@ -230,7 +230,7 @@ def generate_links(cfg,meta,indices=None):
     for pos,i in enumerate(cfg.get('inbounds',[])):
         if indices is not None and pos not in indices:continue
         kind=i.get('type');tls=i.get('tls',{});reality=tls.get('reality',{}).get('enabled',False)
-        if kind not in ('vless','hysteria2') or i.get('transport') or not tls.get('enabled'):raise Error('节点包含未支持的协议/传输，保留旧链接。')
+        if kind not in ('vless','hysteria2') or i.get('transport') or not tls.get('enabled'):continue
         sni=domain(tls['server_name']);p=int(i['listen_port'])
         if not 1<=p<=65535:raise Error('监听端口错误。')
         if is_alpine:ip=meta.get('ipv4') or meta.get('ipv6')
@@ -267,7 +267,7 @@ def generate_links(cfg,meta,indices=None):
     return '\n'.join(lines)+'\n'
 
 # SYNC_SOURCE is populated at build time; no remote code needed for node management.
-SYNC_SOURCE='IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwoiIiJOb2RlIG1ldGFkYXRhIG9ubHk6IG5ldmVyIHJlc3RhcnRzIG9yIGVkaXRzIHNpbmctYm94IGNvbmZpZ3VyYXRpb24uIiIiCmltcG9ydCBiYXNlNjQsZmNudGwsaGFzaGxpYixpcGFkZHJlc3MsanNvbixvcyxwYXRobGliLHJlLHN1YnByb2Nlc3Msc3lzLHRlbXBmaWxlLHRpbWUsdXJsbGliLnBhcnNlLHV1aWQKU1RBVEU9cGF0aGxpYi5QYXRoKCcvdmFyL2xpYi9zaW5nYm94LW5vZGUtc3luYycpCkNPTkZJRz1wYXRobGliLlBhdGgoJy9ldGMvc2luZy1ib3gvY29uZmlnLmpzb24nKQpPVVRQVVQ9cGF0aGxpYi5QYXRoKCcvZXRjL25vZGVzL3NpbmctYm94L2xpbmtzLnR4dCcpClJVTj1wYXRobGliLlBhdGgoJy9ydW4vc2luZ2JveC1ub2RlLXN5bmMnKQpkZWYgcnVuKGFyZ3MsKiprdyk6CiAgICByZXR1cm4gc3VicHJvY2Vzcy5ydW4oYXJncyxjaGVjaz1UcnVlLHN0ZG91dD1zdWJwcm9jZXNzLlBJUEUsc3RkZXJyPXN1YnByb2Nlc3MuREVWTlVMTCx0aW1lb3V0PTIwLCoqa3cpLnN0ZG91dApkZWYgcmVhZChwKTpyZXR1cm4ganNvbi5sb2FkcyhwYXRobGliLlBhdGgocCkucmVhZF90ZXh0KCkpCmRlZiBhdG9taWMocCxkYXRhKToKICAgIHA9cGF0aGxpYi5QYXRoKHApO3AucGFyZW50Lm1rZGlyKHBhcmVudHM9VHJ1ZSxleGlzdF9vaz1UcnVlKQogICAgZmQsbmFtZT10ZW1wZmlsZS5ta3N0ZW1wKHByZWZpeD0nLicrcC5uYW1lKyctJyxkaXI9cC5wYXJlbnQpCiAgICB0cnk6CiAgICAgICAgb3MuZmNobW9kKGZkLDBvNjAwKQogICAgICAgIHdpdGggb3MuZmRvcGVuKGZkLCd3YicpIGFzIGY6Zi53cml0ZShkYXRhLmVuY29kZSgpIGlmIGlzaW5zdGFuY2UoZGF0YSxzdHIpIGVsc2UgZGF0YSk7Zi5mbHVzaCgpO29zLmZzeW5jKGYuZmlsZW5vKCkpCiAgICAgICAgb3MucmVwbGFjZShuYW1lLHApCiAgICBmaW5hbGx5OgogICAgICAgIGlmIG9zLnBhdGguZXhpc3RzKG5hbWUpOm9zLnVubGluayhuYW1lKQojIFVuaWZpZWQgVFhUIHB1YmxpY2F0aW9uIG9ubHk7IGNvcmUgY29uZmlndXJhdGlvbiBhbmQgcmVhZGluZXNzIGNoZWNrcyBzdGF5IHVuY2hhbmdlZC4KZGVmIHB1Ymxpc2hfbm9kZXMoY29udGVudCk6CiAgICAjIFZQU0tJVF9TSEFSRURfUFVCTElDQVRJT04KICAgIGltcG9ydCBydW5weQogICAgcnVucHkucnVuX3BhdGgoJy91c3IvbG9jYWwvbGliL2FyZ28tbm9kZS1maWxlcy9ydW4nLHJ1bl9uYW1lPSd2cHNraXRfcHVibGljYXRpb24nKVsncHVibGlzaCddKCdzaW5nLWJveCcsY29udGVudCkKCmRlZiB3cml0ZShwLGRhdGEpOmF0b21pYyhwLGpzb24uZHVtcHMoZGF0YSxlbnN1cmVfYXNjaWk9RmFsc2UpKQpkZWYgZGlnZXN0KGRhdGEpOnJldHVybiBoYXNobGliLnNoYTI1NihkYXRhKS5oZXhkaWdlc3QoKQpkZWYgY2hlY2tlZF9jb25maWcoKToKICAgIGRhdGE9Q09ORklHLnJlYWRfYnl0ZXMoKTtjZmc9anNvbi5sb2FkcyhkYXRhKQogICAgYmluYXJ5PXJlYWQoU1RBVEUvJ2RlcGxveW1lbnQuanNvbicpWydiaW5hcnknXQogICAgcnVuKFtiaW5hcnksJ2NoZWNrJywnLWMnLHN0cihDT05GSUcpXSkKICAgIGlmIENPTkZJRy5yZWFkX2J5dGVzKCkhPWRhdGE6cmFpc2UgUnVudGltZUVycm9yKCfphY3nva7mo4Dmn6XmnJ/pl7Tlj5HnlJ/lj5jljJbvvIznrYnlvoXkuIvmrKHmo4Dmn6UnKQogICAgcmV0dXJuIGRhdGEsY2ZnCmRlZiBvcGVucmMoKTpyZXR1cm4gcGF0aGxpYi5QYXRoKCcvZXRjL2FscGluZS1yZWxlYXNlJykuZXhpc3RzKCkKZGVmIHByb2Nlc3MoKToKICAgIGlmIG9wZW5yYygpOgogICAgICAgIHJ1bihbJ3JjLXNlcnZpY2UnLCdzaW5nLWJveCcsJ3N0YXR1cyddKQogICAgICAgIHBpZD1pbnQocmVhZChSVU4vJ2FjdGl2ZS5qc29uJylbJ3BpZCddKQogICAgZWxzZToKICAgICAgICBpZiBydW4oWydzeXN0ZW1jdGwnLCdpcy1hY3RpdmUnLCdzaW5nLWJveC5zZXJ2aWNlJ10pLmRlY29kZSgpLnN0cmlwKCkhPSdhY3RpdmUnOnJhaXNlIFJ1bnRpbWVFcnJvcignc2luZy1ib3gg5pyq6L+Q6KGMJykKICAgICAgICBwaWQ9aW50KHJ1bihbJ3N5c3RlbWN0bCcsJ3Nob3cnLCdzaW5nLWJveC5zZXJ2aWNlJywnLS1wcm9wZXJ0eT1NYWluUElEJywnLS12YWx1ZSddKS5kZWNvZGUoKS5zdHJpcCgpKQogICAgaWYgcGlkPD0wOnJhaXNlIFJ1bnRpbWVFcnJvcign5peg5rOV56Gu6K6kIHNpbmctYm94IFBJRCcpCiAgICBwcm9jPXBhdGhsaWIuUGF0aCgnL3Byb2MnKS9zdHIocGlkKQogICAgdGlja3M9cHJvYy5qb2lucGF0aCgnc3RhdCcpLnJlYWRfdGV4dCgpLnJzcGxpdCgnKScsMSlbMV0uc3BsaXQoKVsxOV0KICAgIGFyZ3M9cHJvYy5qb2lucGF0aCgnY21kbGluZScpLnJlYWRfYnl0ZXMoKS5zcGxpdChiJ1wwJykKICAgIGlmIGInLWMnIG5vdCBpbiBhcmdzIG9yIGFyZ3NbYXJncy5pbmRleChiJy1jJykrMV0hPXN0cihDT05GSUcpLmVuY29kZSgpOnJhaXNlIFJ1bnRpbWVFcnJvcign6L+Q6KGM6L+b56iL6YWN572u6Lev5b6E5LiN5Yy56YWNJykKICAgIHJldHVybiBwaWQsdGlja3MKZGVmIG1hcmsoKToKICAgICMgRXhlY1N0YXJ0UG9zdCBydW5zIHdoaWxlIHRoZSB1bml0IGlzIGFjdGl2YXRpbmcsIHNvIGRvIG5vdCByZXF1aXJlIGlzLWFjdGl2ZSBoZXJlLgogICAgcGlkPWludChvcy5lbnZpcm9uLmdldCgnTUFJTlBJRCcsJzAnKSkKICAgIGlmIG5vdCBwaWQ6cGlkPWludChydW4oWydzeXN0ZW1jdGwnLCdzaG93Jywnc2luZy1ib3guc2VydmljZScsJy0tcHJvcGVydHk9TWFpblBJRCcsJy0tdmFsdWUnXSkuZGVjb2RlKCkuc3RyaXAoKSkKICAgIHRpY2tzPXBhdGhsaWIuUGF0aCgnL3Byb2MnLHN0cihwaWQpLCdzdGF0JykucmVhZF90ZXh0KCkucnNwbGl0KCcpJywxKVsxXS5zcGxpdCgpWzE5XQogICAgZGF0YT0oUlVOLydwZW5kaW5nLmpzb24nKS5yZWFkX2J5dGVzKCkKICAgIGlmIENPTkZJRy5yZWFkX2J5dGVzKCkhPWRhdGE6cmFpc2UgUnVudGltZUVycm9yKCflkK/liqjmnJ/pl7TphY3nva7lj5HnlJ/lj5jljJbvvIzor7fph43mlrDlkK/liqjmoLjlv4MnKQogICAgd3JpdGUoUlVOLydhY3RpdmUuanNvbicseydwaWQnOnBpZCwndGlja3MnOnRpY2tzLCdzaGEnOmRpZ2VzdChkYXRhKX0pCiAgICBhdG9taWMoUlVOLydsb2FkZWQuanNvbicsZGF0YSkKZGVmIGNvdW50cnkoaXApOgogICAgdHJ5OmlwPXN0cihpcGFkZHJlc3MuaXBfYWRkcmVzcyhpcCkpCiAgICBleGNlcHQgVmFsdWVFcnJvcjpyZXR1cm4gJycKICAgIHBhdGg9U1RBVEUvKCdjb3VudHJ5LScrZGlnZXN0KGlwLmVuY29kZSgpKVs6MTZdKycuanNvbicpO25vdz10aW1lLnRpbWUoKQogICAgY2FjaGU9e30KICAgIHRyeTpjYWNoZT1yZWFkKHBhdGgpCiAgICBleGNlcHQgKE9TRXJyb3IsVmFsdWVFcnJvcik6cGFzcwogICAgaWYgY2FjaGUuZ2V0KCdleHBpcmVzJywwKT5ub3c6cmV0dXJuIGNhY2hlLmdldCgnbGFiZWwnLCcnKQogICAgcHJvdmlkZXJzPVsoJ2h0dHBzOi8vaXB3aG8uaXMvJytpcCwnY291bnRyeV9jb2RlJywnY291bnRyeScpLCgnaHR0cHM6Ly9pcGFwaS5jby8nK2lwKycvanNvbi8nLCdjb3VudHJ5X2NvZGUnLCdjb3VudHJ5X25hbWUnKSwoJ2h0dHBzOi8vaXBpbmZvLmlvLycraXArJy9qc29uJywnY291bnRyeScsTm9uZSldCiAgICBmb3IgdXJsLGNvZGVfZmllbGQsbmFtZV9maWVsZCBpbiBwcm92aWRlcnM6CiAgICAgICAgdHJ5OgogICAgICAgICAgICByYXc9cnVuKFsnY3VybCcsJy1mTHNTJywnLS1jb25uZWN0LXRpbWVvdXQnLCcyJywnLS1tYXgtdGltZScsJzMnLHVybF0pCiAgICAgICAgICAgIG9iaj1qc29uLmxvYWRzKHJhdyk7Y29kZT1vYmouZ2V0KGNvZGVfZmllbGQsJycpLnVwcGVyKCkKICAgICAgICAgICAgaWYgb2JqLmdldCgnc3VjY2VzcycpIGlzIEZhbHNlIG9yIG9iai5nZXQoJ2Vycm9yJykgb3Igbm90IHJlLmZ1bGxtYXRjaCgnW0EtWl17Mn0nLGNvZGUpOmNvbnRpbnVlCiAgICAgICAgICAgIGZsYWc9Jycuam9pbihjaHIoMHgxZjFlNitvcmQoYyktNjUpIGZvciBjIGluIGNvZGUpCiAgICAgICAgICAgIG5hbWU9b2JqLmdldChuYW1lX2ZpZWxkKSBpZiBuYW1lX2ZpZWxkIGVsc2UgY29kZQogICAgICAgICAgICBsYWJlbD1mbGFnKyhuYW1lIGlmIGlzaW5zdGFuY2UobmFtZSxzdHIpIGFuZCBuYW1lIGVsc2UgY29kZSkKICAgICAgICAgICAgd3JpdGUocGF0aCx7J2xhYmVsJzpsYWJlbCwnZXhwaXJlcyc6bm93Kzg2NDAwLCdpcCc6aXB9KTtyZXR1cm4gbGFiZWwKICAgICAgICBleGNlcHQgKFZhbHVlRXJyb3IsT1NFcnJvcixzdWJwcm9jZXNzLlN1YnByb2Nlc3NFcnJvcixBdHRyaWJ1dGVFcnJvcik6Y29udGludWUKICAgICMgS2VlcCBhbiBvbGQgdmFsaWQgY291bnRyeSB3aGVuIHByb3ZpZGVycyBhcmUgdW5hdmFpbGFibGU7IHJldHJ5IGZhaWx1cmVzIGFmdGVyIDEwIG1pbnV0ZXMuCiAgICBsYWJlbD1jYWNoZS5nZXQoJ2xhYmVsJywnJyk7d3JpdGUocGF0aCx7J2xhYmVsJzpsYWJlbCwnZXhwaXJlcyc6bm93KzYwMCwnaXAnOmlwfSk7cmV0dXJuIGxhYmVsCmRlZiBpcF9mb3IodGFnLG1ldGEpOgogICAgcHJlZmVycmVkPSdpcHY2JyBpZiAnVjYnIGluIHRhZyBlbHNlICdpcHY0JwogICAgcmV0dXJuIG1ldGEuZ2V0KHByZWZlcnJlZCkgb3IgbWV0YS5nZXQoJ2lwdjYnIGlmIHByZWZlcnJlZD09J2lwdjQnIGVsc2UgJ2lwdjQnKSBvciAnJwpkZWYgbm9kZV9uYW1lKG5hbWUsaXApOgogICAgc3VmZml4PWNvdW50cnkoaXApCiAgICByZXR1cm4gdXJsbGliLnBhcnNlLnF1b3RlKG5hbWUrKCctJytzdWZmaXggaWYgc3VmZml4IGVsc2UgJycpLHNhZmU9JycpCmRlZiBwdWJsaWNfa2V5KHByaXZhdGUpOgogICAgcmF3PWJhc2U2NC51cmxzYWZlX2I2NGRlY29kZShwcml2YXRlKyc9JyooKDQtbGVuKHByaXZhdGUpJTQpJTQpKQogICAgaWYgbGVuKHJhdykhPTMyOnJhaXNlIFJ1bnRpbWVFcnJvcignUmVhbGl0eSDnp4HpkqXplb/luqbplJnor68nKQogICAgZGVyPWJ5dGVzLmZyb21oZXgoJzMwMmUwMjAxMDAzMDA1MDYwMzJiNjU2ZTA0MjIwNDIwJykrcmF3CiAgICBwdWI9cnVuKFsnb3BlbnNzbCcsJ3BrZXknLCctaW5mb3JtJywnREVSJywnLXB1Ym91dCcsJy1vdXRmb3JtJywnREVSJ10saW5wdXQ9ZGVyKQogICAgaWYgbGVuKHB1YikhPTQ0IG9yIHB1Yls6MTJdIT1ieXRlcy5mcm9taGV4KCczMDJhMzAwNTA2MDMyYjY1NmUwMzIxMDAnKTpyYWlzZSBSdW50aW1lRXJyb3IoJ+aXoOazleino+aekCBSZWFsaXR5IOWFrOmSpScpCiAgICByZXR1cm4gYmFzZTY0LnVybHNhZmVfYjY0ZW5jb2RlKHB1YlstMzI6XSkuZGVjb2RlKCkucnN0cmlwKCc9JykKZGVmIGxpc3RlbnMocGlkLGNmZyk6CiAgICBpbm9kZXM9c2V0KCkKICAgIGZvciBmZCBpbiBwYXRobGliLlBhdGgoJy9wcm9jJyxzdHIocGlkKSwnZmQnKS5pdGVyZGlyKCk6CiAgICAgICAgdHJ5OgogICAgICAgICAgICB0YXJnZXQ9b3MucmVhZGxpbmsoZmQpCiAgICAgICAgICAgIGlmIHRhcmdldC5zdGFydHN3aXRoKCdzb2NrZXQ6WycpOmlub2Rlcy5hZGQodGFyZ2V0Wzg6LTFdKQogICAgICAgIGV4Y2VwdCBPU0Vycm9yOnBhc3MKICAgIGF2YWlsYWJsZT1zZXQoKQogICAgZm9yIHRhYmxlIGluIFsndGNwJywndGNwNicsJ3VkcCcsJ3VkcDYnXToKICAgICAgICB0cnk6cm93cz1wYXRobGliLlBhdGgoJy9wcm9jJyxzdHIocGlkKSwnbmV0Jyx0YWJsZSkucmVhZF90ZXh0KCkuc3BsaXRsaW5lcygpWzE6XQogICAgICAgIGV4Y2VwdCBPU0Vycm9yOmNvbnRpbnVlCiAgICAgICAgZm9yIHJvdyBpbiByb3dzOgogICAgICAgICAgICBmaWVsZHM9cm93LnNwbGl0KCkKICAgICAgICAgICAgaWYgbGVuKGZpZWxkcyk8MTAgb3IgZmllbGRzWzldIG5vdCBpbiBpbm9kZXM6Y29udGludWUKICAgICAgICAgICAgaWYgdGFibGUuc3RhcnRzd2l0aCgndGNwJykgYW5kIGZpZWxkc1szXSE9JzBBJzpjb250aW51ZQogICAgICAgICAgICBhdmFpbGFibGUuYWRkKCgndGNwJyBpZiB0YWJsZS5zdGFydHN3aXRoKCd0Y3AnKSBlbHNlICd1ZHAnLGludChmaWVsZHNbMV0uc3BsaXQoJzonKVstMV0sMTYpKSkKICAgIGZvciBpbmJvdW5kIGluIGNmZy5nZXQoJ2luYm91bmRzJyxbXSk6CiAgICAgICAga2luZD1pbmJvdW5kLmdldCgndHlwZScpCiAgICAgICAgaWYga2luZCBub3QgaW4gWyd2bGVzcycsJ2h5c3RlcmlhMiddOnJhaXNlIFJ1bnRpbWVFcnJvcign5Ye6546w6Z2e5Y6f6ISa5pys5pSv5oyB55qE5YWl56uZ77yM5pyq6KaG55uW6IqC54K55paH5Lu2JykKICAgICAgICBwcm90b2NvbD0ndWRwJyBpZiBraW5kPT0naHlzdGVyaWEyJyBlbHNlICd0Y3AnCiAgICAgICAgcG9ydD1pbmJvdW5kLmdldCgnbGlzdGVuX3BvcnQnKQogICAgICAgIGlmIG5vdCBpc2luc3RhbmNlKHBvcnQsaW50KSBvciBub3QgMTw9cG9ydDw9NjU1MzUgb3IgKHByb3RvY29sLHBvcnQpIG5vdCBpbiBhdmFpbGFibGU6cmFpc2UgUnVudGltZUVycm9yKCflhaXnq5nnq6/lj6PlsJrmnKrnlLHlvZPliY3moLjlv4Pnm5HlkKwnKQpkZWYgZ2VuZXJhdGUoY2ZnLG1ldGEpOgogICAgaW1wb3J0IHJ1bnB5CiAgICByZXR1cm4gcnVucHkucnVuX3BhdGgoJy91c3IvbG9jYWwvbGliL2FyZ28tc3RhbmRhbG9uZS9tYW5hZ2VyLnB5JyxydW5fbmFtZT0nYXJnb19nZW5lcmF0b3InKVsnZ2VuZXJhdGVfbGlua3MnXShjZmcsbWV0YSkKCmRlZiBzeW5jKCk6CiAgICBwaWQsdGlja3M9cHJvY2VzcygpO2FjdGl2ZT1yZWFkKFJVTi8nYWN0aXZlLmpzb24nKQogICAgZGF0YSxjZmc9Y2hlY2tlZF9jb25maWcoKQogICAgaWYgYWN0aXZlIT17J3BpZCc6cGlkLCd0aWNrcyc6dGlja3MsJ3NoYSc6ZGlnZXN0KGRhdGEpfSBvciAoUlVOLydsb2FkZWQuanNvbicpLnJlYWRfYnl0ZXMoKSE9ZGF0YTpyYWlzZSBSdW50aW1lRXJyb3IoJ+ejgeebmOmFjee9ruacquehruiupOW3suWKoOi9ve+8jOivt+ajgOafpemFjee9ruWQjumHjeWQryBzaW5nLWJveCcpCiAgICBsaXN0ZW5zKHBpZCxjZmcpCiAgICBjb250ZW50PWdlbmVyYXRlKGNmZyxyZWFkKFNUQVRFLydkZXBsb3ltZW50Lmpzb24nKSkKICAgICMgU2xvdyBnZW9sb2NhdGlvbiBtdXN0IG5vdCBhbGxvdyBhIHNlcnZpY2UgcmVzdGFydCBvciBjb25maWcgZWRpdCB0byByYWNlIHRoZSB3cml0ZS4KICAgIGlmIHByb2Nlc3MoKSE9KHBpZCx0aWNrcykgb3IgQ09ORklHLnJlYWRfYnl0ZXMoKSE9ZGF0YSBvciByZWFkKFJVTi8nYWN0aXZlLmpzb24nKSE9YWN0aXZlOnJhaXNlIFJ1bnRpbWVFcnJvcign55Sf5oiQ5pyf6Ze06YWN572u5oiW6L+b56iL5pS55Y+Y77yM5L+d55WZ5pen5paH5Lu2JykKICAgIHB1Ymxpc2hfbm9kZXMoY29udGVudCkKCmRlZiBtYWluKCk6CiAgICBTVEFURS5ta2RpcihwYXJlbnRzPVRydWUsZXhpc3Rfb2s9VHJ1ZSk7UlVOLm1rZGlyKHBhcmVudHM9VHJ1ZSxleGlzdF9vaz1UcnVlKQogICAgb3MuY2htb2QoU1RBVEUsMG83MDApO29zLmNobW9kKFJVTiwwbzcwMCkKICAgIHdpdGggb3BlbihSVU4vJ2xvY2snLCdhJykgYXMgbG9jazoKICAgICAgICBmY250bC5mbG9jayhsb2NrLGZjbnRsLkxPQ0tfRVgpCiAgICAgICAgbW9kZT1zeXMuYXJndlsxXSBpZiBsZW4oc3lzLmFyZ3YpPjEgZWxzZSAnLS1vbmNlJwogICAgICAgIGlmIG1vZGU9PSctLWxhdW5jaCc6CiAgICAgICAgICAgIGRhdGEsY2ZnPWNoZWNrZWRfY29uZmlnKCk7YXRvbWljKFJVTi8ncGVuZGluZy5qc29uJyxkYXRhKQogICAgICAgICAgICBvcy5lbnZpcm9uWydNQUlOUElEJ109c3RyKG9zLmdldHBpZCgpKTttYXJrKCkKICAgICAgICAgICAgYmluYXJ5PXJlYWQoU1RBVEUvJ2RlcGxveW1lbnQuanNvbicpWydiaW5hcnknXQogICAgICAgICAgICAjIFJlbGVhc2UgdGhlIHN5bmMgbG9jayBiZWZvcmUgcmVwbGFjaW5nIHRoaXMgcHJvY2VzcyB3aXRoIHRoZSBjb3JlLgogICAgICAgICAgICBmY250bC5mbG9jayhsb2NrLGZjbnRsLkxPQ0tfVU4pO2xvY2suY2xvc2UoKQogICAgICAgICAgICBvcy5leGVjdihiaW5hcnksW2JpbmFyeSwncnVuJywnLWMnLHN0cihDT05GSUcpXSkKICAgICAgICBlbGlmIG1vZGU9PSctLWNhcHR1cmUnOmRhdGEsY2ZnPWNoZWNrZWRfY29uZmlnKCk7YXRvbWljKFJVTi8ncGVuZGluZy5qc29uJyxkYXRhKQogICAgICAgIGVsaWYgbW9kZT09Jy0tbWFyayc6bWFyaygpCiAgICAgICAgZWxpZiBtb2RlPT0nLS1sYWJlbCc6cHJpbnQobm9kZV9uYW1lKHN5cy5hcmd2WzJdLHN5cy5hcmd2WzNdKSkKICAgICAgICBlbGlmIG1vZGU9PSctLW9uY2UnOnN5bmMoKQogICAgICAgIGVsc2U6cmFpc2UgUnVudGltZUVycm9yKCfmnKrnn6Xov5DooYzlj4LmlbAnKQppZiBfX25hbWVfXz09J19fbWFpbl9fJzoKICAgIHRyeToKICAgICAgICBpZiBsZW4oc3lzLmFyZ3YpPjEgYW5kIHN5cy5hcmd2WzFdPT0nLS13YXRjaCc6CiAgICAgICAgICAgIHN5cy5hcmd2WzFdPSctLW9uY2UnCiAgICAgICAgICAgIHdoaWxlIFRydWU6CiAgICAgICAgICAgICAgICB0cnk6bWFpbigpCiAgICAgICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICAgICAgICAgICAgICAgICAgcHJpbnQodGltZS5zdHJmdGltZSgnJVktJW0tJWRUJUg6JU06JVNaJyx0aW1lLmdtdGltZSgpKSsnIOWQjOatpeacquWujOaIkO+8jOS/neeVmeaXp+aWh+S7tu+8micrKHN0cihlKSBpZiBpc2luc3RhbmNlKGUsUnVudGltZUVycm9yKSBlbHNlIHR5cGUoZSkuX19uYW1lX18pLGZpbGU9c3lzLnN0ZGVycixmbHVzaD1UcnVlKQogICAgICAgICAgICAgICAgdGltZS5zbGVlcCg2MCkKICAgICAgICBlbHNlOm1haW4oKQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOgogICAgICAgICMgRG8gbm90IHByaW50IEpTT04sIHBhc3N3b3JkcywgcHJpdmF0ZSBrZXlzLCBvciBjb21wbGV0ZSBVUklzIHRvIHNlcnZpY2UgbG9ncy4KICAgICAgICBwcmludCh0aW1lLnN0cmZ0aW1lKCclWS0lbS0lZFQlSDolTTolU1onLHRpbWUuZ210aW1lKCkpKycg5ZCM5q2l5aSx6LSl77yI5L+d55WZ5pen5paH5Lu277yJ77yaJyt0eXBlKGUpLl9fbmFtZV9fKycgJysoc3RyKGUpIGlmIGlzaW5zdGFuY2UoZSxSdW50aW1lRXJyb3IpIGVsc2UgJ+ivt+ajgOafpemFjee9ruOAgeS+nei1luWPiuadg+mZkCcpLGZpbGU9c3lzLnN0ZGVycikKICAgICAgICBzeXMuZXhpdCgxKQo='
+SYNC_SOURCE='IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwoiIiJOb2RlIG1ldGFkYXRhIG9ubHk6IG5ldmVyIHJlc3RhcnRzIG9yIGVkaXRzIHNpbmctYm94IGNvbmZpZ3VyYXRpb24uIiIiCmltcG9ydCBiYXNlNjQsZmNudGwsaGFzaGxpYixpcGFkZHJlc3MsanNvbixvcyxwYXRobGliLHJlLHN1YnByb2Nlc3Msc3lzLHRlbXBmaWxlLHRpbWUsdXJsbGliLnBhcnNlLHV1aWQKU1RBVEU9cGF0aGxpYi5QYXRoKCcvdmFyL2xpYi9zaW5nYm94LW5vZGUtc3luYycpCkNPTkZJRz1wYXRobGliLlBhdGgoJy9ldGMvc2luZy1ib3gvY29uZmlnLmpzb24nKQpPVVRQVVQ9cGF0aGxpYi5QYXRoKCcvZXRjL25vZGVzL3NpbmctYm94L2xpbmtzLnR4dCcpClJVTj1wYXRobGliLlBhdGgoJy9ydW4vc2luZ2JveC1ub2RlLXN5bmMnKQpkZWYgcnVuKGFyZ3MsKiprdyk6CiAgICByZXR1cm4gc3VicHJvY2Vzcy5ydW4oYXJncyxjaGVjaz1UcnVlLHN0ZG91dD1zdWJwcm9jZXNzLlBJUEUsc3RkZXJyPXN1YnByb2Nlc3MuREVWTlVMTCx0aW1lb3V0PTIwLCoqa3cpLnN0ZG91dApkZWYgcmVhZChwKTpyZXR1cm4ganNvbi5sb2FkcyhwYXRobGliLlBhdGgocCkucmVhZF90ZXh0KCkpCmRlZiBhdG9taWMocCxkYXRhKToKICAgIHA9cGF0aGxpYi5QYXRoKHApO3AucGFyZW50Lm1rZGlyKHBhcmVudHM9VHJ1ZSxleGlzdF9vaz1UcnVlKQogICAgZmQsbmFtZT10ZW1wZmlsZS5ta3N0ZW1wKHByZWZpeD0nLicrcC5uYW1lKyctJyxkaXI9cC5wYXJlbnQpCiAgICB0cnk6CiAgICAgICAgb3MuZmNobW9kKGZkLDBvNjAwKQogICAgICAgIHdpdGggb3MuZmRvcGVuKGZkLCd3YicpIGFzIGY6Zi53cml0ZShkYXRhLmVuY29kZSgpIGlmIGlzaW5zdGFuY2UoZGF0YSxzdHIpIGVsc2UgZGF0YSk7Zi5mbHVzaCgpO29zLmZzeW5jKGYuZmlsZW5vKCkpCiAgICAgICAgb3MucmVwbGFjZShuYW1lLHApCiAgICBmaW5hbGx5OgogICAgICAgIGlmIG9zLnBhdGguZXhpc3RzKG5hbWUpOm9zLnVubGluayhuYW1lKQojIFVuaWZpZWQgVFhUIHB1YmxpY2F0aW9uIG9ubHk7IGNvcmUgY29uZmlndXJhdGlvbiBhbmQgcmVhZGluZXNzIGNoZWNrcyBzdGF5IHVuY2hhbmdlZC4KZGVmIHB1Ymxpc2hfbm9kZXMoY29udGVudCk6CiAgICAjIFZQU0tJVF9TSEFSRURfUFVCTElDQVRJT04KICAgIGltcG9ydCBydW5weQogICAgcnVucHkucnVuX3BhdGgoJy91c3IvbG9jYWwvbGliL2FyZ28tbm9kZS1maWxlcy9ydW4nLHJ1bl9uYW1lPSd2cHNraXRfcHVibGljYXRpb24nKVsncHVibGlzaCddKCdzaW5nLWJveCcsY29udGVudCkKCmRlZiB3cml0ZShwLGRhdGEpOmF0b21pYyhwLGpzb24uZHVtcHMoZGF0YSxlbnN1cmVfYXNjaWk9RmFsc2UpKQpkZWYgZGlnZXN0KGRhdGEpOnJldHVybiBoYXNobGliLnNoYTI1NihkYXRhKS5oZXhkaWdlc3QoKQpkZWYgY2hlY2tlZF9jb25maWcoKToKICAgIGRhdGE9Q09ORklHLnJlYWRfYnl0ZXMoKTtjZmc9anNvbi5sb2FkcyhkYXRhKQogICAgYmluYXJ5PXJlYWQoU1RBVEUvJ2RlcGxveW1lbnQuanNvbicpWydiaW5hcnknXQogICAgcnVuKFtiaW5hcnksJ2NoZWNrJywnLWMnLHN0cihDT05GSUcpXSkKICAgIGlmIENPTkZJRy5yZWFkX2J5dGVzKCkhPWRhdGE6cmFpc2UgUnVudGltZUVycm9yKCfphY3nva7mo4Dmn6XmnJ/pl7Tlj5HnlJ/lj5jljJbvvIznrYnlvoXkuIvmrKHmo4Dmn6UnKQogICAgcmV0dXJuIGRhdGEsY2ZnCmRlZiBvcGVucmMoKTpyZXR1cm4gcGF0aGxpYi5QYXRoKCcvZXRjL2FscGluZS1yZWxlYXNlJykuZXhpc3RzKCkKZGVmIHByb2Nlc3MoKToKICAgIGlmIG9wZW5yYygpOgogICAgICAgIHJ1bihbJ3JjLXNlcnZpY2UnLCdzaW5nLWJveCcsJ3N0YXR1cyddKQogICAgICAgIHBpZD1pbnQocmVhZChSVU4vJ2FjdGl2ZS5qc29uJylbJ3BpZCddKQogICAgZWxzZToKICAgICAgICBpZiBydW4oWydzeXN0ZW1jdGwnLCdpcy1hY3RpdmUnLCdzaW5nLWJveC5zZXJ2aWNlJ10pLmRlY29kZSgpLnN0cmlwKCkhPSdhY3RpdmUnOnJhaXNlIFJ1bnRpbWVFcnJvcignc2luZy1ib3gg5pyq6L+Q6KGMJykKICAgICAgICBwaWQ9aW50KHJ1bihbJ3N5c3RlbWN0bCcsJ3Nob3cnLCdzaW5nLWJveC5zZXJ2aWNlJywnLS1wcm9wZXJ0eT1NYWluUElEJywnLS12YWx1ZSddKS5kZWNvZGUoKS5zdHJpcCgpKQogICAgaWYgcGlkPD0wOnJhaXNlIFJ1bnRpbWVFcnJvcign5peg5rOV56Gu6K6kIHNpbmctYm94IFBJRCcpCiAgICBwcm9jPXBhdGhsaWIuUGF0aCgnL3Byb2MnKS9zdHIocGlkKQogICAgdGlja3M9cHJvYy5qb2lucGF0aCgnc3RhdCcpLnJlYWRfdGV4dCgpLnJzcGxpdCgnKScsMSlbMV0uc3BsaXQoKVsxOV0KICAgIGFyZ3M9cHJvYy5qb2lucGF0aCgnY21kbGluZScpLnJlYWRfYnl0ZXMoKS5zcGxpdChiJ1wwJykKICAgIGlmIGInLWMnIG5vdCBpbiBhcmdzIG9yIGFyZ3NbYXJncy5pbmRleChiJy1jJykrMV0hPXN0cihDT05GSUcpLmVuY29kZSgpOnJhaXNlIFJ1bnRpbWVFcnJvcign6L+Q6KGM6L+b56iL6YWN572u6Lev5b6E5LiN5Yy56YWNJykKICAgIHJldHVybiBwaWQsdGlja3MKZGVmIG1hcmsoKToKICAgICMgRXhlY1N0YXJ0UG9zdCBydW5zIHdoaWxlIHRoZSB1bml0IGlzIGFjdGl2YXRpbmcsIHNvIGRvIG5vdCByZXF1aXJlIGlzLWFjdGl2ZSBoZXJlLgogICAgcGlkPWludChvcy5lbnZpcm9uLmdldCgnTUFJTlBJRCcsJzAnKSkKICAgIGlmIG5vdCBwaWQ6cGlkPWludChydW4oWydzeXN0ZW1jdGwnLCdzaG93Jywnc2luZy1ib3guc2VydmljZScsJy0tcHJvcGVydHk9TWFpblBJRCcsJy0tdmFsdWUnXSkuZGVjb2RlKCkuc3RyaXAoKSkKICAgIHRpY2tzPXBhdGhsaWIuUGF0aCgnL3Byb2MnLHN0cihwaWQpLCdzdGF0JykucmVhZF90ZXh0KCkucnNwbGl0KCcpJywxKVsxXS5zcGxpdCgpWzE5XQogICAgZGF0YT0oUlVOLydwZW5kaW5nLmpzb24nKS5yZWFkX2J5dGVzKCkKICAgIGlmIENPTkZJRy5yZWFkX2J5dGVzKCkhPWRhdGE6cmFpc2UgUnVudGltZUVycm9yKCflkK/liqjmnJ/pl7TphY3nva7lj5HnlJ/lj5jljJbvvIzor7fph43mlrDlkK/liqjmoLjlv4MnKQogICAgd3JpdGUoUlVOLydhY3RpdmUuanNvbicseydwaWQnOnBpZCwndGlja3MnOnRpY2tzLCdzaGEnOmRpZ2VzdChkYXRhKX0pCiAgICBhdG9taWMoUlVOLydsb2FkZWQuanNvbicsZGF0YSkKZGVmIGNvdW50cnkoaXApOgogICAgdHJ5OmlwPXN0cihpcGFkZHJlc3MuaXBfYWRkcmVzcyhpcCkpCiAgICBleGNlcHQgVmFsdWVFcnJvcjpyZXR1cm4gJycKICAgIHBhdGg9U1RBVEUvKCdjb3VudHJ5LScrZGlnZXN0KGlwLmVuY29kZSgpKVs6MTZdKycuanNvbicpO25vdz10aW1lLnRpbWUoKQogICAgY2FjaGU9e30KICAgIHRyeTpjYWNoZT1yZWFkKHBhdGgpCiAgICBleGNlcHQgKE9TRXJyb3IsVmFsdWVFcnJvcik6cGFzcwogICAgaWYgY2FjaGUuZ2V0KCdleHBpcmVzJywwKT5ub3c6cmV0dXJuIGNhY2hlLmdldCgnbGFiZWwnLCcnKQogICAgcHJvdmlkZXJzPVsoJ2h0dHBzOi8vaXB3aG8uaXMvJytpcCwnY291bnRyeV9jb2RlJywnY291bnRyeScpLCgnaHR0cHM6Ly9pcGFwaS5jby8nK2lwKycvanNvbi8nLCdjb3VudHJ5X2NvZGUnLCdjb3VudHJ5X25hbWUnKSwoJ2h0dHBzOi8vaXBpbmZvLmlvLycraXArJy9qc29uJywnY291bnRyeScsTm9uZSldCiAgICBmb3IgdXJsLGNvZGVfZmllbGQsbmFtZV9maWVsZCBpbiBwcm92aWRlcnM6CiAgICAgICAgdHJ5OgogICAgICAgICAgICByYXc9cnVuKFsnY3VybCcsJy1mTHNTJywnLS1jb25uZWN0LXRpbWVvdXQnLCcyJywnLS1tYXgtdGltZScsJzMnLHVybF0pCiAgICAgICAgICAgIG9iaj1qc29uLmxvYWRzKHJhdyk7Y29kZT1vYmouZ2V0KGNvZGVfZmllbGQsJycpLnVwcGVyKCkKICAgICAgICAgICAgaWYgb2JqLmdldCgnc3VjY2VzcycpIGlzIEZhbHNlIG9yIG9iai5nZXQoJ2Vycm9yJykgb3Igbm90IHJlLmZ1bGxtYXRjaCgnW0EtWl17Mn0nLGNvZGUpOmNvbnRpbnVlCiAgICAgICAgICAgIGZsYWc9Jycuam9pbihjaHIoMHgxZjFlNitvcmQoYyktNjUpIGZvciBjIGluIGNvZGUpCiAgICAgICAgICAgIG5hbWU9b2JqLmdldChuYW1lX2ZpZWxkKSBpZiBuYW1lX2ZpZWxkIGVsc2UgY29kZQogICAgICAgICAgICBsYWJlbD1mbGFnKyhuYW1lIGlmIGlzaW5zdGFuY2UobmFtZSxzdHIpIGFuZCBuYW1lIGVsc2UgY29kZSkKICAgICAgICAgICAgd3JpdGUocGF0aCx7J2xhYmVsJzpsYWJlbCwnZXhwaXJlcyc6bm93Kzg2NDAwLCdpcCc6aXB9KTtyZXR1cm4gbGFiZWwKICAgICAgICBleGNlcHQgKFZhbHVlRXJyb3IsT1NFcnJvcixzdWJwcm9jZXNzLlN1YnByb2Nlc3NFcnJvcixBdHRyaWJ1dGVFcnJvcik6Y29udGludWUKICAgICMgS2VlcCBhbiBvbGQgdmFsaWQgY291bnRyeSB3aGVuIHByb3ZpZGVycyBhcmUgdW5hdmFpbGFibGU7IHJldHJ5IGZhaWx1cmVzIGFmdGVyIDEwIG1pbnV0ZXMuCiAgICBsYWJlbD1jYWNoZS5nZXQoJ2xhYmVsJywnJyk7d3JpdGUocGF0aCx7J2xhYmVsJzpsYWJlbCwnZXhwaXJlcyc6bm93KzYwMCwnaXAnOmlwfSk7cmV0dXJuIGxhYmVsCmRlZiBpcF9mb3IodGFnLG1ldGEpOgogICAgcHJlZmVycmVkPSdpcHY2JyBpZiAnVjYnIGluIHRhZyBlbHNlICdpcHY0JwogICAgcmV0dXJuIG1ldGEuZ2V0KHByZWZlcnJlZCkgb3IgbWV0YS5nZXQoJ2lwdjYnIGlmIHByZWZlcnJlZD09J2lwdjQnIGVsc2UgJ2lwdjQnKSBvciAnJwpkZWYgbm9kZV9uYW1lKG5hbWUsaXApOgogICAgc3VmZml4PWNvdW50cnkoaXApCiAgICByZXR1cm4gdXJsbGliLnBhcnNlLnF1b3RlKG5hbWUrKCctJytzdWZmaXggaWYgc3VmZml4IGVsc2UgJycpLHNhZmU9JycpCmRlZiBwdWJsaWNfa2V5KHByaXZhdGUpOgogICAgcmF3PWJhc2U2NC51cmxzYWZlX2I2NGRlY29kZShwcml2YXRlKyc9JyooKDQtbGVuKHByaXZhdGUpJTQpJTQpKQogICAgaWYgbGVuKHJhdykhPTMyOnJhaXNlIFJ1bnRpbWVFcnJvcignUmVhbGl0eSDnp4HpkqXplb/luqbplJnor68nKQogICAgZGVyPWJ5dGVzLmZyb21oZXgoJzMwMmUwMjAxMDAzMDA1MDYwMzJiNjU2ZTA0MjIwNDIwJykrcmF3CiAgICBwdWI9cnVuKFsnb3BlbnNzbCcsJ3BrZXknLCctaW5mb3JtJywnREVSJywnLXB1Ym91dCcsJy1vdXRmb3JtJywnREVSJ10saW5wdXQ9ZGVyKQogICAgaWYgbGVuKHB1YikhPTQ0IG9yIHB1Yls6MTJdIT1ieXRlcy5mcm9taGV4KCczMDJhMzAwNTA2MDMyYjY1NmUwMzIxMDAnKTpyYWlzZSBSdW50aW1lRXJyb3IoJ+aXoOazleino+aekCBSZWFsaXR5IOWFrOmSpScpCiAgICByZXR1cm4gYmFzZTY0LnVybHNhZmVfYjY0ZW5jb2RlKHB1YlstMzI6XSkuZGVjb2RlKCkucnN0cmlwKCc9JykKZGVmIGxpc3RlbnMocGlkLGNmZyk6CiAgICBpbm9kZXM9c2V0KCkKICAgIGZvciBmZCBpbiBwYXRobGliLlBhdGgoJy9wcm9jJyxzdHIocGlkKSwnZmQnKS5pdGVyZGlyKCk6CiAgICAgICAgdHJ5OgogICAgICAgICAgICB0YXJnZXQ9b3MucmVhZGxpbmsoZmQpCiAgICAgICAgICAgIGlmIHRhcmdldC5zdGFydHN3aXRoKCdzb2NrZXQ6WycpOmlub2Rlcy5hZGQodGFyZ2V0Wzg6LTFdKQogICAgICAgIGV4Y2VwdCBPU0Vycm9yOnBhc3MKICAgIGF2YWlsYWJsZT1zZXQoKQogICAgZm9yIHRhYmxlIGluIFsndGNwJywndGNwNicsJ3VkcCcsJ3VkcDYnXToKICAgICAgICB0cnk6cm93cz1wYXRobGliLlBhdGgoJy9wcm9jJyxzdHIocGlkKSwnbmV0Jyx0YWJsZSkucmVhZF90ZXh0KCkuc3BsaXRsaW5lcygpWzE6XQogICAgICAgIGV4Y2VwdCBPU0Vycm9yOmNvbnRpbnVlCiAgICAgICAgZm9yIHJvdyBpbiByb3dzOgogICAgICAgICAgICBmaWVsZHM9cm93LnNwbGl0KCkKICAgICAgICAgICAgaWYgbGVuKGZpZWxkcyk8MTAgb3IgZmllbGRzWzldIG5vdCBpbiBpbm9kZXM6Y29udGludWUKICAgICAgICAgICAgaWYgdGFibGUuc3RhcnRzd2l0aCgndGNwJykgYW5kIGZpZWxkc1szXSE9JzBBJzpjb250aW51ZQogICAgICAgICAgICBhdmFpbGFibGUuYWRkKCgndGNwJyBpZiB0YWJsZS5zdGFydHN3aXRoKCd0Y3AnKSBlbHNlICd1ZHAnLGludChmaWVsZHNbMV0uc3BsaXQoJzonKVstMV0sMTYpKSkKICAgIGZvciBpbmJvdW5kIGluIGNmZy5nZXQoJ2luYm91bmRzJyxbXSk6CiAgICAgICAga2luZD1pbmJvdW5kLmdldCgndHlwZScpCiAgICAgICAgaWYga2luZCBub3QgaW4gWyd2bGVzcycsJ2h5c3RlcmlhMiddOmNvbnRpbnVlCiAgICAgICAgcHJvdG9jb2w9J3VkcCcgaWYga2luZD09J2h5c3RlcmlhMicgZWxzZSAndGNwJwogICAgICAgIHBvcnQ9aW5ib3VuZC5nZXQoJ2xpc3Rlbl9wb3J0JykKICAgICAgICBpZiBub3QgaXNpbnN0YW5jZShwb3J0LGludCkgb3Igbm90IDE8PXBvcnQ8PTY1NTM1IG9yIChwcm90b2NvbCxwb3J0KSBub3QgaW4gYXZhaWxhYmxlOnJhaXNlIFJ1bnRpbWVFcnJvcign5YWl56uZ56uv5Y+j5bCa5pyq55Sx5b2T5YmN5qC45b+D55uR5ZCsJykKZGVmIGdlbmVyYXRlKGNmZyxtZXRhKToKICAgIGltcG9ydCBydW5weQogICAgcmV0dXJuIHJ1bnB5LnJ1bl9wYXRoKCcvdXNyL2xvY2FsL2xpYi9hcmdvLXN0YW5kYWxvbmUvbWFuYWdlci5weScscnVuX25hbWU9J2FyZ29fZ2VuZXJhdG9yJylbJ2dlbmVyYXRlX2xpbmtzJ10oY2ZnLG1ldGEpCgpkZWYgc3luYygpOgogICAgcGlkLHRpY2tzPXByb2Nlc3MoKTthY3RpdmU9cmVhZChSVU4vJ2FjdGl2ZS5qc29uJykKICAgIGRhdGEsY2ZnPWNoZWNrZWRfY29uZmlnKCkKICAgIGlmIGFjdGl2ZSE9eydwaWQnOnBpZCwndGlja3MnOnRpY2tzLCdzaGEnOmRpZ2VzdChkYXRhKX0gb3IgKFJVTi8nbG9hZGVkLmpzb24nKS5yZWFkX2J5dGVzKCkhPWRhdGE6cmFpc2UgUnVudGltZUVycm9yKCfno4Hnm5jphY3nva7mnKrnoa7orqTlt7LliqDovb3vvIzor7fmo4Dmn6XphY3nva7lkI7ph43lkK8gc2luZy1ib3gnKQogICAgbGlzdGVucyhwaWQsY2ZnKQogICAgY29udGVudD1nZW5lcmF0ZShjZmcscmVhZChTVEFURS8nZGVwbG95bWVudC5qc29uJykpCiAgICAjIFNsb3cgZ2VvbG9jYXRpb24gbXVzdCBub3QgYWxsb3cgYSBzZXJ2aWNlIHJlc3RhcnQgb3IgY29uZmlnIGVkaXQgdG8gcmFjZSB0aGUgd3JpdGUuCiAgICBpZiBwcm9jZXNzKCkhPShwaWQsdGlja3MpIG9yIENPTkZJRy5yZWFkX2J5dGVzKCkhPWRhdGEgb3IgcmVhZChSVU4vJ2FjdGl2ZS5qc29uJykhPWFjdGl2ZTpyYWlzZSBSdW50aW1lRXJyb3IoJ+eUn+aIkOacn+mXtOmFjee9ruaIlui/m+eoi+aUueWPmO+8jOS/neeVmeaXp+aWh+S7ticpCiAgICBwdWJsaXNoX25vZGVzKGNvbnRlbnQpCgpkZWYgbWFpbigpOgogICAgU1RBVEUubWtkaXIocGFyZW50cz1UcnVlLGV4aXN0X29rPVRydWUpO1JVTi5ta2RpcihwYXJlbnRzPVRydWUsZXhpc3Rfb2s9VHJ1ZSkKICAgIG9zLmNobW9kKFNUQVRFLDBvNzAwKTtvcy5jaG1vZChSVU4sMG83MDApCiAgICB3aXRoIG9wZW4oUlVOLydsb2NrJywnYScpIGFzIGxvY2s6CiAgICAgICAgZmNudGwuZmxvY2sobG9jayxmY250bC5MT0NLX0VYKQogICAgICAgIG1vZGU9c3lzLmFyZ3ZbMV0gaWYgbGVuKHN5cy5hcmd2KT4xIGVsc2UgJy0tb25jZScKICAgICAgICBpZiBtb2RlPT0nLS1sYXVuY2gnOgogICAgICAgICAgICBkYXRhLGNmZz1jaGVja2VkX2NvbmZpZygpO2F0b21pYyhSVU4vJ3BlbmRpbmcuanNvbicsZGF0YSkKICAgICAgICAgICAgb3MuZW52aXJvblsnTUFJTlBJRCddPXN0cihvcy5nZXRwaWQoKSk7bWFyaygpCiAgICAgICAgICAgIGJpbmFyeT1yZWFkKFNUQVRFLydkZXBsb3ltZW50Lmpzb24nKVsnYmluYXJ5J10KICAgICAgICAgICAgIyBSZWxlYXNlIHRoZSBzeW5jIGxvY2sgYmVmb3JlIHJlcGxhY2luZyB0aGlzIHByb2Nlc3Mgd2l0aCB0aGUgY29yZS4KICAgICAgICAgICAgZmNudGwuZmxvY2sobG9jayxmY250bC5MT0NLX1VOKTtsb2NrLmNsb3NlKCkKICAgICAgICAgICAgb3MuZXhlY3YoYmluYXJ5LFtiaW5hcnksJ3J1bicsJy1jJyxzdHIoQ09ORklHKV0pCiAgICAgICAgZWxpZiBtb2RlPT0nLS1jYXB0dXJlJzpkYXRhLGNmZz1jaGVja2VkX2NvbmZpZygpO2F0b21pYyhSVU4vJ3BlbmRpbmcuanNvbicsZGF0YSkKICAgICAgICBlbGlmIG1vZGU9PSctLW1hcmsnOm1hcmsoKQogICAgICAgIGVsaWYgbW9kZT09Jy0tbGFiZWwnOnByaW50KG5vZGVfbmFtZShzeXMuYXJndlsyXSxzeXMuYXJndlszXSkpCiAgICAgICAgZWxpZiBtb2RlPT0nLS1vbmNlJzpzeW5jKCkKICAgICAgICBlbHNlOnJhaXNlIFJ1bnRpbWVFcnJvcign5pyq55+l6L+Q6KGM5Y+C5pWwJykKaWYgX19uYW1lX189PSdfX21haW5fXyc6CiAgICB0cnk6CiAgICAgICAgaWYgbGVuKHN5cy5hcmd2KT4xIGFuZCBzeXMuYXJndlsxXT09Jy0td2F0Y2gnOgogICAgICAgICAgICBzeXMuYXJndlsxXT0nLS1vbmNlJwogICAgICAgICAgICB3aGlsZSBUcnVlOgogICAgICAgICAgICAgICAgdHJ5Om1haW4oKQogICAgICAgICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOgogICAgICAgICAgICAgICAgICAgIHByaW50KHRpbWUuc3RyZnRpbWUoJyVZLSVtLSVkVCVIOiVNOiVTWicsdGltZS5nbXRpbWUoKSkrJyDlkIzmraXmnKrlrozmiJDvvIzkv53nlZnml6fmlofku7bvvJonKyhzdHIoZSkgaWYgaXNpbnN0YW5jZShlLFJ1bnRpbWVFcnJvcikgZWxzZSB0eXBlKGUpLl9fbmFtZV9fKSxmaWxlPXN5cy5zdGRlcnIsZmx1c2g9VHJ1ZSkKICAgICAgICAgICAgICAgIHRpbWUuc2xlZXAoNjApCiAgICAgICAgZWxzZTptYWluKCkKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgICAgICAjIERvIG5vdCBwcmludCBKU09OLCBwYXNzd29yZHMsIHByaXZhdGUga2V5cywgb3IgY29tcGxldGUgVVJJcyB0byBzZXJ2aWNlIGxvZ3MuCiAgICAgICAgcHJpbnQodGltZS5zdHJmdGltZSgnJVktJW0tJWRUJUg6JU06JVNaJyx0aW1lLmdtdGltZSgpKSsnIOWQjOatpeWksei0pe+8iOS/neeVmeaXp+aWh+S7tu+8ie+8micrdHlwZShlKS5fX25hbWVfXysnICcrKHN0cihlKSBpZiBpc2luc3RhbmNlKGUsUnVudGltZUVycm9yKSBlbHNlICfor7fmo4Dmn6XphY3nva7jgIHkvp3otZblj4rmnYPpmZAnKSxmaWxlPXN5cy5zdGRlcnIpCiAgICAgICAgc3lzLmV4aXQoMSkK'
 def verify_service_config():
     if active():
         if alpine():
@@ -291,10 +291,11 @@ def verify_service_config():
         elif str(CONFIG) not in call(['systemctl','show','sing-box.service','--property=ExecStart','--value']).decode():raise Error('服务配置路径不匹配。')
 
 PUBLICATION_SOURCE='ZGVmIHB1Ymxpc2hfbm9kZXMoY29udGVudCk6CiAgICAjIFZQU0tJVF9TSEFSRURfUFVCTElDQVRJT04KICAgIGltcG9ydCBydW5weQogICAgcnVucHkucnVuX3BhdGgoJy91c3IvbG9jYWwvbGliL2FyZ28tbm9kZS1maWxlcy9ydW4nLHJ1bl9uYW1lPSd2cHNraXRfcHVibGljYXRpb24nKVsncHVibGlzaCddKCdzaW5nLWJveCcsY29udGVudCkK'
-def current_sync_source(source):
-    if '# VPSKIT_SHARED_PUBLICATION' not in source:
-        raise Error('这是旧版同步程序，请从安装菜单执行全新安装。')
-    compile(source,'node sync','exec')
+def fresh_sync_source():
+    # Deploy the current bundled worker; do not classify or adapt old worker source.
+    template=LIB/'singbox-worker.py'
+    source=template.read_text()
+    compile(source,str(template),'exec')
     return source
 
 @locked
@@ -308,18 +309,23 @@ def initialize_sync():
                 try:
                     address=call(['curl','-'+family,'-fLsS','--max-time','4',url],timeout=6).decode().strip();ips['ipv'+family]=str(ipaddress.ip_address(address));break
                 except Exception:pass
-        if not ips:raise Error('无法检测公网 IP，不能生成节点链接。')
+        if not ips:
+            while True:
+                value=prompt('公网 IP 检测失败，请输入节点连接用的 IPv4 或 IPv6（0 返回）')
+                if value=='0':raise Cancel()
+                try:
+                    address=ipaddress.ip_address(value);ips['ipv'+str(address.version)]=str(address);break
+                except ValueError:say('请输入有效的 IP 地址。','warn')
         META.parent.mkdir(parents=True,exist_ok=True);os.chmod(META.parent,0o700);write(META,dict(ips,binary=core,mode='2',domain=''))
     patched=False;alpine_worker_changed=False
     for path in (pathlib.Path('/usr/local/lib/singbox-node-sync/run'),pathlib.Path('/usr/local/lib/alpine-node-sync/run')):
         if not path.exists():continue
-        original_source=path.read_text()
-        source=current_sync_source(original_source)
-        if 'def generate(cfg,meta):' not in source or "'/run/singbox-node-sync'" not in source:raise Error('检测到未知节点同步程序，未改动它。')
+        original_source=path.read_bytes()
+        source=fresh_sync_source()
         if '# ARGO_CERT_GENERATOR' not in source:
             prefix="def generate(cfg,meta):\n    # ARGO_CERT_GENERATOR\n    import runpy\n    return runpy.run_path('/usr/local/lib/argo-standalone/manager.py',run_name='argo_generator')['generate_links'](cfg,meta)\n"
             source=source.replace('def generate(cfg,meta):\n',prefix,1)
-        if source!=original_source:
+        if source.encode()!=original_source:
             atomic(path,source,0o700)
             if str(path)=='/usr/local/lib/alpine-node-sync/run':alpine_worker_changed=True
         patched=True
@@ -519,31 +525,75 @@ def http_check(row):
                 raise Error('80 端口被占用或无法绑定；请选择 DNS 验证。')
 
 def lego_command(exe,home,row,renew=False):
-    version=call([exe,'--version']).decode()
-    match=re.search(r'(?:version\s*:?\s*|^v?)(\d+)\.',version,re.I|re.M)
-    if not match:raise Error('无法识别 lego 版本，未发起证书申请。')
-    major=int(match.group(1))
-    if major not in (4,5):raise Error('尚未适配此 lego 主版本，未发起申请。')
+    root_help=call([exe,'--help']).decode()
+    run_help=call([exe,'run','--help']).decode()
+    subcommand=all(flag in run_help for flag in ('--path','--email','--domains','--accept-tos'))
+    helptext=run_help if subcommand else root_help
     common=['--path',str(home),'--email',row['email'],'--accept-tos','--domains',row['domain']]
-    if row['method'] in ('dns','dns-manual'):common+=['--dns','manual' if row['method']=='dns-manual' else 'cloudflare']
-    else:common+=['--http','--http.address' if major==5 else '--http.port',':80']
-    if major==5:
-        helptext=call([exe,'run','--help']).decode()
-        required=['--path','--email','--domains','--accept-tos','--dns' if row['method'] in ('dns','dns-manual') else '--http']
-        if not all(flag in helptext for flag in required):raise Error('lego run 参数不匹配，未发起申请。')
-        # Legacy data can only be migrated by lego itself; preserve a private backup first.
+    if row['method'] in ('dns','dns-manual'):
+        if '--dns' not in helptext:raise Error('当前 lego 不支持所需 DNS 参数。')
+        common+=['--dns','manual' if row['method']=='dns-manual' else 'cloudflare']
+    else:
+        address=next((flag for flag in ('--http.address','--http.port') if flag in helptext),None)
+        if not address or '--http' not in helptext:raise Error('当前 lego 不支持所需 HTTP 参数。')
+        common+=['--http',address,':80']
+    if not all(flag in helptext for flag in ('--path','--email','--domains','--accept-tos')):
+        raise Error('lego 缺少必要申请参数，请更换申请程序。')
+    if subcommand:
         if any((home/'accounts').glob('*/*/keys')):
-            backup=home.with_name(home.name+'-before-v5-'+str(time.time_ns()))
+            if 'migrate' not in root_help:raise Error('lego 无法迁移已有账户，请使用新的申请目录。')
+            backup=home.with_name(home.name+'-before-migrate-'+str(time.time_ns()))
             shutil.copytree(home,backup);os.chmod(backup,0o700)
             call([exe,'migrate','--path',str(home)],timeout=120)
-        return [str(exe),'run']+common+(['--renew-force','--no-random-sleep'] if renew and row['method']=='dns-manual' else ['--renew-days','30'] if renew else [])
-    return [str(exe)]+common+(['renew','--days','3650' if row['method']=='dns-manual' else '30'] if renew else ['run'])
+        renew_flags=['--renew-force','--no-random-sleep'] if row['method']=='dns-manual' else ['--renew-days','30']
+        if renew and not all(flag in run_help for flag in renew_flags if flag.startswith('--')):
+            raise Error('lego 缺少必要续签参数，请更换申请程序。')
+        return [str(exe),'run']+common+(renew_flags if renew else [])
+    if renew:
+        if '--days' not in call([exe,'renew','--help']).decode():raise Error('lego 缺少必要续签参数。')
+        return [str(exe)]+common+['renew','--days','3650' if row['method']=='dns-manual' else '30']
+    return [str(exe)]+common+['run']
 
 @locked
 def client_issue(row,renew=False):
+    paused=[]
+    try:
+        while row['method']=='http':
+            try:http_check(row);break
+            except Error as error:
+                if not sys.stdin.isatty():raise
+                say(str(error),'warn')
+                option=choose('1 重试 / 2 改用 Cloudflare DNS / 3 改用手动 DNS / 4 临时停止 Web 服务 / 0 返回',('0','1','2','3','4'))
+                if option=='0':raise Cancel()
+                if option in ('2','3'):
+                    row['method']='dns' if option=='2' else 'dns-manual'
+                    if option=='2':
+                        authfile=ROOT/'auth'/row['id']/('token-'+str(time.time_ns())+'.json')
+                        write(authfile,cf_credentials(row['domain']));row['auth_file']=str(authfile)
+                    break
+                if option=='4':
+                    available=[]
+                    for name in ('nginx','caddy','apache2','httpd'):
+                        args=['rc-service',name,'status'] if alpine() else ['systemctl','is-active','--quiet',name]
+                        if subprocess.run(args,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode==0:
+                            available.append(name);item(len(available),name)
+                    if not available:say('未发现可暂停的已知 Web 服务；可选择 DNS 验证。','warn');continue
+                    number=choose('选择暂停的服务 / 0 返回',tuple(str(n) for n in range(len(available)+1)))
+                    if number=='0':continue
+                    name=available[int(number)-1]
+                    if confirm('临时停止 '+name+'？本次申请结束后恢复。'):
+                        paused.append(name)
+                        call(['rc-service',name,'stop'] if alpine() else ['systemctl','stop',name])
+        return client_issue_impl(row,renew)
+    finally:
+        for name in reversed(paused):
+            try:call(['rc-service',name,'start'] if alpine() else ['systemctl','start',name])
+            except Exception:say('恢复 '+name+' 失败，请手动启动该服务。','warn')
+
+def client_issue_impl(row,renew=False):
     home=pathlib.Path(row['client_home']) if row.get('client_home') else ROOT/'clients'/row['id']/row['client'];home.mkdir(parents=True,exist_ok=True);os.chmod(home,0o700)
     export=home/'export';export.mkdir(exist_ok=True);env=cert_environment(row);log=ROOT/'logs'/(row['id']+'.log')
-    http_check(row);say('正在'+('续签' if renew else '申请')+'：'+row['domain']+' / '+row['client']) if sys.stdin.isatty() else None
+    say('正在'+('续签' if renew else '申请')+'：'+row['domain']+' / '+row['client']) if sys.stdin.isatty() else None
     if row['client']=='acme.sh':
         exe=install_acme();base=['sh',exe,'--home',exe.parent,'--config-home',home,'--server','letsencrypt']
         if row['method']=='dns-manual':
@@ -660,8 +710,10 @@ def issue_certificate(host=None,selfsigned=False):
     if existing and not confirm('已有该域名证书，重新检查/申请并替换它的管理方式？'):return existing
     method=choose('验证方式：1 Cloudflare DNS API / 2 HTTP（公网 80） / 3 手动 DNS-01（无 API）',('1','2','3'),'1');method={'1':'dns','2':'http','3':'dns-manual'}[method]
     auth=cf_credentials(host) if method=='dns' else None
-    email=prompt('ACME 联系邮箱')
-    if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email):raise Error('请输入有效邮箱。')
+    while True:
+        email=prompt('ACME 联系邮箱')
+        if re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email):break
+        say('请输入有效邮箱。','warn')
     if method=='dns-manual':
         selected=choose('手动 DNS 申请程序：1 acme.sh / 2 lego',('1','2'),'2');client='acme.sh' if selected=='1' else 'lego'
         say('手动 DNS-01 使用 '+client+'；后续续签也需人工添加 TXT。','warn')
@@ -681,7 +733,7 @@ def issue_certificate(host=None,selfsigned=False):
         row['client_home']=str(ROOT/'clients'/row['id']/('attempt-'+str(time.time_ns())+'-'+row['client']))
         cert,key=client_issue(row)
     result=publish_certificate(row,cert,key)
-    if method=='dns-manual':say('✓ 手动 DNS 证书已保存；到期前请进入“续签证书”并按提示更新 TXT。','ok')
+    if row['method']=='dns-manual':say('✓ 手动 DNS 证书已保存；到期前请进入“续签证书”并按提示更新 TXT。','ok')
     else:schedule_renew();say('✓ 已启用每日续签检查。','ok')
     return result
 
@@ -724,6 +776,47 @@ def list_certificates(select=False,host=None):
         return None if value=='0' else valid[int(value)-1][1]
     return valid
 
+@locked
+def replace_certificate_bindings(oldrow,newrow):
+    """Switch only exact path bindings; restore both cores if either reload fails."""
+    sbold=CONFIG.read_bytes() if CONFIG.exists() else None
+    xold=XCONFIG.read_bytes() if XCONFIG.exists() else None
+    mold=XSTATE.read_bytes() if XSTATE.exists() else None
+    sb=json.loads(sbold) if sbold else None;x=json.loads(xold) if xold else None
+    sbchanged=xchanged=False
+    if sb:
+        for node in sb.get('inbounds',[]):
+            tls=node.get('tls',{})
+            if (tls.get('certificate_path'),tls.get('key_path'))==(oldrow['cert'],oldrow['key']):
+                tls.update(server_name=newrow['domain'],certificate_path=newrow['cert'],key_path=newrow['key']);sbchanged=True
+    if x:
+        for node in x.get('inbounds',[]):
+            tls=node.get('streamSettings',{}).get('tlsSettings',{})
+            certificates=tls.get('certificates',[])
+            if any((c.get('certificateFile'),c.get('keyFile'))==(oldrow['cert'],oldrow['key']) for c in certificates):
+                if len(certificates)!=1:raise Error('节点含多张证书，请在修改配置中选择所需证书。')
+                tls.update(serverName=newrow['domain'],certificates=[dict(certificateFile=newrow['cert'],keyFile=newrow['key'])]);xchanged=True
+    if xchanged and mold is None:raise Error('Xray 缺少部署信息，请先重新安装或在配置菜单中处理。')
+    check_certificate(newrow['cert'],newrow['key'],newrow['domain'],trust=newrow['kind']=='formal')
+    if not sbchanged and not xchanged:say('没有节点使用旧证书路径；新证书已保存。','dim');return
+    sbcommitted=False;xattempted=False
+    try:
+        if sbchanged:initialize_sync();commit_config(sb,sbold);sbcommitted=True
+        if xchanged:
+            if XCONFIG.read_bytes()!=xold or XSTATE.read_bytes()!=mold:raise Error('Xray 配置已改变，请重新操作。')
+            meta=json.loads(mold);meta.setdefault('certificate_modes',{})[newrow['cert']]=newrow['kind']=='formal'
+            xattempted=True;write(XCONFIG,x);write(XSTATE,meta);xrestart()
+    except BaseException:
+        if xattempted:
+            atomic(XCONFIG,xold);atomic(XSTATE,mold)
+            try:xrestart()
+            except Exception:say('Xray 配置已恢复，服务恢复失败，请查看日志。','warn')
+        if sbcommitted:
+            try:commit_config(json.loads(sbold),CONFIG.read_bytes())
+            except Exception:say('sing-box 回滚失败，请查看日志。','warn')
+        raise
+    say('证书已切换，节点链接和合并订阅已更新。','ok')
+
 def cert_menu():
     while True:
         title('证书申请 / 续签');item(1,'申请正式证书','install');item(2,'查看已有证书');item(3,'续签证书','edit');item(4,'生成自签证书','install');item(0,'返回首页','dim')
@@ -738,7 +831,13 @@ def cert_menu():
             else:
                 row=list_certificates(True)
                 if row:
-                    if row['method'] in ('external','self'):raise Error('此证书由原安装程序续签，或为自签证书；可在申请菜单生成并切换新证书。')
+                    if row['method'] in ('external','self'):
+                        if confirm('重新生成/申请 '+row['domain']+' 的证书？成功后可替换当前节点证书。'):
+                            replacement=issue_certificate(row['domain'],selfsigned=row['kind']=='self')
+                            if replacement and (replacement['cert'],replacement['key'])!=(row['cert'],row['key']):
+                                if confirm('将使用旧证书路径的节点切换到新证书，并更新链接？'):
+                                    replace_certificate_bindings(row,replacement)
+                        continue
                     if confirm('检查并续签 '+row['domain']+'？'):
                         cert,key=client_issue(row,True);publish_certificate(row,cert,key);schedule_renew()
         except Cancel:pass
@@ -850,6 +949,7 @@ def edit_listen_ports(targets):
         if value is not None:target['listen_port']=value
 
 def edit_node(kind):
+    fresh_sync_source()
     cfg=config();old=CONFIG.read_bytes();indices=select_inbounds(cfg,kind);new=copy.deepcopy(cfg);targets=[new['inbounds'][i] for i in indices];display_indices=list(indices)
     title('修改 '+{'reality':'VLESS-Reality','tls':'VLESS-TLS','hy2':'Hysteria2'}[kind])
     for i in indices:
@@ -864,9 +964,14 @@ def edit_node(kind):
     if len(users)>1:
         for num,u in enumerate(users,1):item(num,u.get('name','用户 '+str(num)))
         user=int(choose('用户编号',tuple(str(i) for i in range(1,len(users)+1))))-1
-    if any(len(t['users'])!=len(users) or t['users'][user].get('name')!=users[user].get('name') for t in targets):
-        raise Error('两组节点用户结构不同，请分别修改 IPv4 和 IPv6。')
-    selected_users=[t['users'][user] for t in targets]
+    selected_users=[]
+    for target in targets:
+        entries=target['users']
+        if len(entries)==len(users) and entries[user].get('name')==users[user].get('name'):
+            selected_users.append(entries[user]);continue
+        say('IPv'+str(ipaddress.ip_address(target.get('listen','::')).version)+' 用户列表不同，请选择对应用户。','dim')
+        for num,entry in enumerate(entries,1):item(num,entry.get('name','用户 '+str(num)))
+        selected_users.append(entries[int(choose('用户编号',tuple(str(n) for n in range(1,len(entries)+1))))-1])
     if kind=='hy2':
         value=group_input('HY2 密码（G 自动生成）',[u['password'] for u in selected_users],generate=lambda:secrets.token_urlsafe(24),secret=True)
         if value is not None:
@@ -1015,6 +1120,13 @@ depend() { need net; after firewall; }
 def xrestart():
     if not alpine():raise Error('现有 Xray 管理仅支持 Alpine。')
     call([XBIN,'run','-test','-config',XCONFIG])
+    source=XWORKER.read_text()
+    legacy="host=sni if meta['domain_mode'] else ip"
+    source=source.replace("raise RuntimeError('仅支持这些安装脚本的 VLESS TCP TLS 配置')",'continue')
+    if legacy in source:
+        updated=source.replace(legacy,"host=sni if meta.get('certificate_modes',{}).get(stream['tlsSettings'].get('certificates',[{}])[0].get('certificateFile',''),meta.get('domain_mode',False)) else ip")
+        source=updated
+    if source!=XWORKER.read_text():compile(source,str(XWORKER),'exec');atomic(XWORKER,source,0o700)
     xstop();xservice_setup();call(['rc-service','vpskit-xray','start'])
     error=None
     for _ in range(40):
@@ -1053,14 +1165,14 @@ def xedit():
     old=certs[0]
     row=select_certificate(dict(server_name=tls['serverName'],certificate_path=old['certificateFile'],key_path=old['keyFile']))
     if row:
-        if any(t['streamSettings']['tlsSettings'].get('serverName')!=tls['serverName'] or t['streamSettings']['tlsSettings'].get('certificates')!=certs for t in candidates):raise Error('多个独立证书的配置不能共用当前同步模式，未保存修改。')
         prior_sni=tls['serverName'];prior_certs=copy.deepcopy(certs)
-        # Both installers share one certificate/SNI; keep the sharing relationship.
-        for target in candidates:
+        shared=[target for target in candidates if target is not i and target['streamSettings']['tlsSettings'].get('serverName')==prior_sni and target['streamSettings']['tlsSettings'].get('certificates',[])==prior_certs]
+        together=bool(shared) and choose('其它节点共用证书：1 一起更换 / 2 仅所选节点',('1','2'),'2')=='1'
+        for target in [i]+(shared if together else []):
             t=target['streamSettings']['tlsSettings']
             if t.get('serverName')==prior_sni and t.get('certificates',[])==prior_certs:
                 t['serverName']=row['domain'];t['certificates']=[dict(certificateFile=row['cert'],keyFile=row['key'])]
-        meta['domain_mode']=row['kind']=='formal'
+        meta.setdefault('certificate_modes',{})[row['cert']]=row['kind']=='formal'
     candidate=json.dumps(cfg,ensure_ascii=False,indent=2)+'\n'
     temp=XCONFIG.with_name('.vpskit-test-'+secrets.token_hex(4)+'.json')
     try:
@@ -1088,27 +1200,11 @@ def stop_unit(name):
 @locked
 def uninstall_core(kind):
     if kind=='xray' and not alpine():raise Error('现有 Xray 管理仅支持 Alpine。')
-    marker=XSTATE if kind=='xray' else META
-    if not marker.exists():raise Error('未发现本工具管理的安装记录，未执行卸载。')
-    if not confirm('卸载独立 '+kind+' 核心、配置及其链接？证书和其他节点保留。'):return
-    if kind=='xray':
-        xstop()
-        if alpine():call(['rc-update','del','vpskit-xray','default'],allowed=(0,1))
-        cron=subprocess.run(['crontab','-l'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
-        if cron.returncode==0:call(['crontab','-'],input=('\n'.join(l for l in cron.stdout.decode().splitlines() if '# xray-node-sync' not in l)+'\n').encode())
-        files=[XCONFIG,pathlib.Path(XBIN),pathlib.Path('/etc/init.d/vpskit-xray')]
-        folders=['/usr/local/lib/xray-node-sync','/var/lib/xray-node-sync','/run/xray-node-sync']
-    else:
-        for unit in ('singbox-node-sync.timer','argo-sb-sync.timer','alpine-node-sync','argo-sb-sync','sing-box'):stop_unit(unit)
-        files=[CONFIG,pathlib.Path('/usr/local/bin/sing-box'),pathlib.Path('/etc/init.d/sing-box'),pathlib.Path('/etc/init.d/alpine-node-sync'),RC_SYNC]
-        files += [pathlib.Path('/etc/systemd/system',n) for n in ('sing-box.service','singbox-node-sync.service','singbox-node-sync.timer','argo-sb-sync.service','argo-sb-sync.timer')]
-        folders=['/usr/local/lib/singbox-node-sync','/usr/local/lib/alpine-node-sync','/var/lib/singbox-node-sync','/run/singbox-node-sync','/etc/systemd/system/sing-box.service.d']
-        link=pathlib.Path('/usr/bin/sing-box')
-        if link.is_symlink() and os.readlink(link)=='/usr/local/bin/sing-box':files.append(link)
-    remove_group(kind)
-    for p in files:p.unlink(missing_ok=True)
-    for folder in folders:shutil.rmtree(folder,ignore_errors=True)
-    if not alpine():call(['systemctl','daemon-reload'])
+    say('将清理独立 '+kind+' 的已知服务、核心文件、配置目录和节点链接。','warn')
+    say('配置目录：'+('/etc/xray、/usr/local/etc/xray' if kind=='xray' else '/etc/sing-box、/usr/local/etc/sing-box'),'dim')
+    say('ARGO、另一种核心和共享证书保留。','dim')
+    if not confirm('确认卸载独立 '+kind+'？'):return
+    fresh_cleanup(kind)
     say('卸载完成，合并订阅已重新生成。','ok')
 
 def fresh_cleanup(kind):
@@ -1187,10 +1283,17 @@ def fresh_install(kind,source):
     say('全新安装 '+kind+'：旧配置、服务和节点链接将被清理，不备份、不恢复。','warn')
     if not confirm('确认清理旧安装并继续全新部署？'):
         say('已取消安装，原配置和服务保持不变。','dim');return False
+    if alpine():
+        call(['apk','add','--no-cache','bash','curl','ca-certificates','python3','openssl','jq','tar','unzip','socat','iproute2','openrc','bind-tools'],timeout=1800)
+    if source.name=='singbox.sh':
+        preflight=managed_run(['bash',source],timeout=1800,env=dict(os.environ,VPSKIT_PREFLIGHT_ONLY='1'))
+        if preflight.returncode:raise Error('依赖预检查未完成，未清理已有安装；修复上方问题后重试。')
     fresh_cleanup(kind)
     try:
         env=dict(os.environ,VPSKIT_INSTALL_CONFIRMED='1')
         result=managed_run(['bash',source],timeout=1800,env=env)
+        if result.returncode==20:
+            fresh_cleanup(kind);say('已取消本次部署；确认后清理的旧安装不会恢复。','dim');return False
         if result.returncode:raise Error('安装器未完成，请重新安装。')
         if kind=='xray':xrestart();xinfo()
         else:

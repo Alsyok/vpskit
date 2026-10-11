@@ -1,4 +1,9 @@
 #!/bin/sh
+if [ -n "${VPSKIT_HTTP_HELPER:-}" ] && [ -f "$VPSKIT_HTTP_HELPER" ]; then
+    . "$VPSKIT_HTTP_HELPER"
+else
+    vpskit_http_run() { "$@"; }
+fi
 # ============================================================
 # masb.sh (Alpine) - sing-box server installer (musl)
 # ------------------------------------------------------------
@@ -71,17 +76,14 @@ rand_port() {
 
 pick_port() {
   var="$1"; label="$2"
-  prompt "$var" "$label 端口（回车=随机）" ""
-  eval "p=\${$var:-}"
-  if [ -z "$p" ]; then
-    p="$(rand_port)"
-    echo "[i] $label 随机端口：$p"
-  fi
-  case "$p" in
-    ''|*[!0-9]*) die "$label 端口非法：$p" ;;
-  esac
-  [ "$p" -ge 1 ] && [ "$p" -le 65535 ] || die "$label 端口超出范围：$p"
-  eval "$var=\$p"
+  while :; do
+    prompt "$var" "$label 端口（回车=随机）" ""
+    eval "p=\${$var:-}"
+    if [ -z "$p" ]; then p="$(rand_port)"; echo "[i] $label 随机端口：$p"; fi
+    case "$p" in ''|*[!0-9]*) echo "$label 端口应为 1–65535，请重新输入。"; continue;; esac
+    if [ "$p" -ge 1 ] && [ "$p" -le 65535 ]; then eval "$var=\$p"; break; fi
+    echo "$label 端口应为 1–65535，请重新输入。"
+  done
 }
 
 #################################
@@ -132,7 +134,12 @@ detect_public_ips_strict() {
   [ -n "$PUB6" ] && echo "[+] IPv6：$PUB6" || echo "[-] IPv6：不可用"
   echo "----------------------------"
 
-  [ -n "$PUB4" ] || [ -n "$PUB6" ] || die "未检测到 IPv4 或 IPv6 公网出口，终止部署"
+  while [ -z "$PUB4" ] && [ -z "$PUB6" ]; do
+    read -r -p "公网 IP 检测失败，请输入连接 IP（0 返回）： " MANUAL_IP
+    [ "$MANUAL_IP" != 0 ] || exit 20
+    MANUAL_FAMILY=$(python3 -c 'import ipaddress,sys; print(ipaddress.ip_address(sys.argv[1]).version)' "$MANUAL_IP" 2>/dev/null) || { echo "请输入有效 IP。"; continue; }
+    if [ "$MANUAL_FAMILY" = 4 ]; then PUB4="$MANUAL_IP"; else PUB6="$MANUAL_IP"; fi
+  done
 }
 
 #################################
@@ -360,7 +367,8 @@ check_domain_dns_points_to_me() {
     return 0
   fi
 
-  die "域名 A/AAAA 均未指向本机公网 IP（IPv4=${PUB4:-无} IPv6=${PUB6:-无}），请先修正 DNS"
+  echo "域名 A/AAAA 均未指向本机公网 IP（IPv4=${PUB4:-无} IPv6=${PUB6:-无}），请修正 DNS 后重试。" >&2
+  return 1
 }
 
 # 公网可达性预检（best-effort）
@@ -430,16 +438,10 @@ issue_le_cert_http01() {
 
   install_acme_sh
 
-  if ss -lnt 2>/dev/null | grep -qE ':[[:space:]]*80[[:space:]]'; then
-    echo "[x] 检测到 80 端口正在被占用，HTTP-01 standalone 需要 80 端口。"
-    echo "    请先释放 80（停止 nginx/caddy 等），再重试。"
-    exit 1
-  fi
-
   echo "[i] Let's Encrypt 签发（HTTP-01 standalone）：$domain"
   /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1 || true
 
-  /root/.acme.sh/acme.sh --issue --standalone -d "$domain" --keylength 2048 \
+  vpskit_http_run /root/.acme.sh/acme.sh --issue --standalone -d "$domain" --keylength 2048 \
     || die "LE 签发失败：请检查域名解析/80端口/防火墙/安全组"
 
   mkdir -p "$(dirname "$fullchain")"
@@ -654,7 +656,7 @@ def listens(pid,cfg):
             available.add(('tcp' if table.startswith('tcp') else 'udp',int(fields[1].split(':')[-1],16)))
     for inbound in cfg.get('inbounds',[]):
         kind=inbound.get('type')
-        if kind not in ['vless','hysteria2']:raise RuntimeError('出现非原脚本支持的入站，未覆盖节点文件')
+        if kind not in ['vless','hysteria2']:continue
         protocol='udp' if kind=='hysteria2' else 'tcp'
         port=inbound.get('listen_port')
         if not isinstance(port,int) or not 1<=port<=65535 or (protocol,port) not in available:raise RuntimeError('入站端口尚未由当前核心监听')
@@ -828,10 +830,12 @@ TLS_FULLCHAIN="/etc/sing-box/tls/fullchain.pem"
 choose_tls_mode
 
 if [ "$TLS_MODE" = "1" ]; then
-  prompt TLS_SNI "请输入用于 TLS 的域名（A 或 AAAA 记录至少一个指向本机公网IP；需开放80）" ""
-  [ -n "${TLS_SNI:-}" ] || die "域名不能为空"
-
-  check_domain_dns_points_to_me "$TLS_SNI"
+  while :; do
+    prompt TLS_SNI "请输入 TLS 域名（A/AAAA 指向本机，0 返回）" ""
+    [ "$TLS_SNI" != 0 ] || exit 20
+    [ -n "$TLS_SNI" ] || { echo "域名不能为空。"; continue; }
+    if check_domain_dns_points_to_me "$TLS_SNI"; then break; fi
+  done
   reuse_or_issue_le_cert_http01 "$TLS_SNI" "$TLS_FULLCHAIN" "$TLS_KEY"
 
   TLS_INSECURE="0"

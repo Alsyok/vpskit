@@ -8,7 +8,7 @@ singbox_standalone_install() {
         if [ "$MANAGER" = openrc ]; then
             apk add --no-cache bash curl ca-certificates
         else
-            apt-get update
+            vpskit_apt_update
             apt-get install -y bash curl ca-certificates
         fi
     fi
@@ -20,7 +20,7 @@ singbox_standalone_install() {
 standalone_tools() {
     if ! command -v python3 >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v socat >/dev/null 2>&1; then
         if [ "$MANAGER" = openrc ]; then apk add --no-cache python3 openssl curl ca-certificates socat;
-        else apt-get update; apt-get install -y python3 openssl curl ca-certificates socat; fi
+        else vpskit_apt_update; apt-get install -y python3 openssl curl ca-certificates socat; fi
     fi
     mkdir -p /usr/local/lib/argo-standalone
     chmod 700 /usr/local/lib/argo-standalone
@@ -28,6 +28,25 @@ standalone_tools() {
     cp "$VPSKIT_ROOT/lib/node-manager.py" "$standalone_helper_tmp"
     chmod 700 "$standalone_helper_tmp"
     mv -f "$standalone_helper_tmp" /usr/local/lib/argo-standalone/manager.py
+    if [ "$MANAGER" = openrc ]; then worker_installer="$VPSKIT_ROOT/installers/Encrypt.sh";
+    else worker_installer="$VPSKIT_ROOT/installers/singbox.sh"; fi
+    python3 - "$worker_installer" <<'WORKER_TEMPLATE_PY'
+import os,pathlib,re,tempfile
+import sys
+installer=pathlib.Path(sys.argv[1]).read_text()
+match=re.search(r"<<'NODE_SYNC_PY'\n(.*?)\nNODE_SYNC_PY",installer,re.S)
+if not match:raise RuntimeError('安装器缺少当前同步程序')
+source=match.group(1)
+compile(source,'singbox-worker.py','exec')
+folder=pathlib.Path('/usr/local/lib/argo-standalone')
+fd,tmp=tempfile.mkstemp(dir=folder,prefix='.worker.')
+try:
+    os.fchmod(fd,0o700)
+    with os.fdopen(fd,'w') as stream:stream.write(source)
+    os.replace(tmp,folder/'singbox-worker.py')
+finally:
+    if os.path.exists(tmp):os.unlink(tmp)
+WORKER_TEMPLATE_PY
 }
 standalone_action() {
     standalone_tools
